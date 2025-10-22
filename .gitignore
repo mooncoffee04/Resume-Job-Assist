@@ -67,9 +67,6 @@ outputs/
 *.json
 *.csv
 
-# Streamlit
-.streamlit/secrets.toml
-
 # Neo4j
 *.db
 *.log
