@@ -869,11 +869,23 @@ def analytics_dashboard_page():
     
     st.header("📈 Analytics Dashboard")
     
+    # Initialize default values
+    total_analyses = 0
+    total_users = 0
+    estimated_skills = 0
+    recent_analyses = 0
+    connection_status = "❌ Unknown"
+    
     try:
         from connection import init_neo4j, neo4j_connection
+        
+        # Test Neo4j connection first
         init_neo4j()
         
         with neo4j_connection.get_session() as session:
+            # Test the connection with a simple query first
+            test_result = session.run("RETURN 1 as test").single()
+            
             # Get total analyses count
             analyses_result = session.run("MATCH (a:Analysis) RETURN count(a) as total_analyses")
             total_analyses = analyses_result.single()['total_analyses']
@@ -901,51 +913,40 @@ def analytics_dashboard_page():
                 RETURN count(a) as recent_analyses
             """)
             recent_analyses = recent_result.single()['recent_analyses']
-        
-        # Show metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("📊 Total Analyses", total_analyses)
-        with col2:
-            st.metric("👥 Registered Users", total_users)
-        with col3:
-            st.metric("🛠️ Est. Skills Found", estimated_skills)
-        with col4:
-            st.metric("📅 Recent (30 days)", recent_analyses)
-        
-        # Additional insights
-        if total_analyses > 0:
-            st.markdown("---")
-            st.subheader("📊 Insights")
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                avg_per_user = total_analyses / max(total_users, 1)
-                st.metric("📈 Avg Analyses per User", f"{avg_per_user:.1f}")
-            
-            with col2:
-                if recent_analyses > 0:
-                    st.metric("🔥 Activity Level", "Active" if recent_analyses >= 5 else "Moderate")
-                else:
-                    st.metric("🔥 Activity Level", "Low")
+        connection_status = "✅ Connected"
+        st.success("📊 Analytics loaded successfully!")
         
     except Exception as e:
-        st.error(f"Error loading analytics: {e}")
-        # Fallback to static numbers
-        st.info("🚧 Using sample data - database connection issue")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
+        st.warning(f"🔧 Database connection issue")
+        connection_status = "❌ Connection Failed"
+        st.error(f"Error: {str(e)}")
+    
+    # Show metrics (will show 0 if connection failed)
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("📊 Total Analyses", total_analyses)
+    with col2:
+        st.metric("👥 Registered Users", total_users)
+    with col3:
+        st.metric("🛠️ Est. Skills Found", estimated_skills)
+    with col4:
+        st.metric("📅 Recent (30 days)", recent_analyses)
+    
+    # Show connection status
+    st.markdown("---")
+    st.metric("🔗 Database Status", connection_status)
+    
+    # Additional insights if we have data
+    if total_analyses > 0:
+        col1, col2 = st.columns(2)
         with col1:
-            st.metric("📊 Total Analyses", "0")
+            avg_per_user = total_analyses / max(total_users, 1)
+            st.metric("📈 Avg per User", f"{avg_per_user:.1f}")
         with col2:
-            st.metric("👥 Registered Users", "0") 
-        with col3:
-            st.metric("🛠️ Est. Skills Found", "0")
-        with col4:
-            st.metric("📅 Recent (30 days)", "0")
+            activity = "🔥 Active" if recent_analyses >= 5 else "📉 Low"
+            st.metric("Activity Level", activity)
 
 def settings_page():
     """Settings and configuration page"""
