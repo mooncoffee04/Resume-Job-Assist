@@ -254,21 +254,6 @@ def display_original_resume(resume_file_path):
         st.info(f"**Size:** {file_size:,} bytes")
         st.info(f"**Type:** {file_extension}")
         
-        # Provide download button
-        try:
-            with open(file_path, 'rb') as file:
-                file_data = file.read()
-                st.download_button(
-                    label="⬇️ Download Resume",
-                    data=file_data,
-                    file_name=file_path.name,
-                    mime="application/octet-stream",
-                    use_container_width=True
-                )
-                st.success("✅ File found and ready for download!")
-        except Exception as e:
-            st.error(f"❌ Could not read file for download: {e}")
-            return
         
         # Display content in browser based on file type
         if file_extension == '.pdf':
