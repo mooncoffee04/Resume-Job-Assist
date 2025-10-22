@@ -97,23 +97,6 @@ def upload_and_process_page():
     """Main upload and processing page"""
     
     st.header("📤 Upload Your Resume")
-    # Debug secrets - add this right after the imports
-    st.write("DEBUG: Checking secrets access...")
-    try:
-        if hasattr(st, 'secrets'):
-            st.write(f"Secrets object exists: {type(st.secrets)}")
-            st.write(f"Available secrets keys: {list(st.secrets.keys()) if st.secrets else 'None'}")
-            
-            # Check specific keys
-            for key in ['GEMINI_API_KEY', 'NEO4J_URI', 'NEO4J_USER', 'NEO4J_PASSWORD']:
-                if key in st.secrets:
-                    st.write(f"✅ {key}: Found (length: {len(st.secrets[key])})")
-                else:
-                    st.write(f"❌ {key}: Not found")
-        else:
-            st.write("❌ st.secrets not available")
-    except Exception as e:
-        st.write(f"❌ Error accessing secrets: {e}")
     
     # File upload
     uploaded_file = st.file_uploader(
