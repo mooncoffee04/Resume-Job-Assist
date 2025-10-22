@@ -358,11 +358,11 @@ def settings_page():
     st.subheader("🌍 Environment Variables")
     
     env_vars = {
-        "GEMINI_API_KEY": os.getenv('GEMINI_API_KEY'),
-        "NEO4J_URI": os.getenv('NEO4J_URI'),
-        "NEO4J_USER": os.getenv('NEO4J_USER'),
-        "NEO4J_PASSWORD": os.getenv('NEO4J_PASSWORD')
-    }
+    "GEMINI_API_KEY": st.secrets.get('GEMINI_API_KEY') or os.getenv('GEMINI_API_KEY'),
+    "NEO4J_URI": st.secrets.get('NEO4J_URI') or os.getenv('NEO4J_URI'),
+    "NEO4J_USER": st.secrets.get('NEO4J_USER') or os.getenv('NEO4J_USER'),
+    "NEO4J_PASSWORD": st.secrets.get('NEO4J_PASSWORD') or os.getenv('NEO4J_PASSWORD')
+}
     
     for var, value in env_vars.items():
         if value:
