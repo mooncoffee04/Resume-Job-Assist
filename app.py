@@ -37,29 +37,68 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS with Dark Mode
 st.markdown("""
 <style>
+    /* Dark mode styling */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;  /* Reduced from 3rem */
         font-weight: bold;
-        color: #1f77b4;
+        color: #00d4ff;  /* Changed to cyan for dark mode */
         text-align: center;
         margin-bottom: 2rem;
     }
+    
     .success-box {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 0.25rem;
+        background-color: #1e3a2e;
+        border: 1px solid #4caf50;
+        border-radius: 0.5rem;
         padding: 1rem;
         margin: 1rem 0;
+        color: #ffffff;
     }
+    
     .info-box {
-        background-color: #cce7ff;
-        border: 1px solid #99d6ff;
-        border-radius: 0.25rem;
+        background-color: #1a2332;
+        border: 1px solid #00d4ff;
+        border-radius: 0.5rem;
         padding: 1rem;
         margin: 1rem 0;
+        color: #ffffff;
+    }
+    
+    /* Fix metric text overflow */
+    .metric-container .metric-value {
+        font-size: 1.2rem !important;
+        word-wrap: break-word;
+        max-width: 100%;
+    }
+    
+    /* Dark mode for dataframes */
+    .stDataFrame {
+        background-color: #262730;
+    }
+    
+    /* Dark mode for charts */
+    .stPlotlyChart {
+        background-color: transparent;
+    }
+    
+    /* Sidebar dark mode */
+    .css-1d391kg {
+        background-color: #1e1e1e;
+    }
+    
+    /* Text inputs dark mode */
+    .stTextInput input {
+        background-color: #262730;
+        color: #fafafa;
+        border: 1px solid #444;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -258,11 +297,20 @@ def display_analysis_results(analysis_data):
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("🎓 Name", personal.get('name', 'Not found'))
+            name = personal.get('name', 'Not found')
+            if len(name) > 15:
+                name = name[:12] + "..."
+            st.metric("🎓 Name", name)
         with col2:
-            st.metric("📚 Education", f"{personal.get('education_level', '')} {personal.get('field_of_study', '')}")
+            education = f"{personal.get('education_level', '')} {personal.get('field_of_study', '')}"
+            if len(education) > 20:
+                education = education[:17] + "..."
+            st.metric("📚 Education", education)
         with col3:
-            st.metric("🏫 University", personal.get('university', 'Not found'))
+            university = personal.get('university', 'Not found')
+            if len(university) > 15:
+                university = university[:12] + "..."
+        st.metric("🏫 University", university)
     
     # Technical skills
     tech_skills = analysis_data.get('technical_skills', [])
@@ -283,7 +331,14 @@ def display_analysis_results(analysis_data):
                 fig = px.pie(
                     values=category_counts.values,
                     names=category_counts.index,
-                    title="Skills by Category"
+                    title="Skills by Category",
+                    color_discrete_sequence=px.colors.qualitative.Set3  # Better colors for dark mode
+                )
+                # Update layout for dark mode
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font_color='white'
                 )
                 st.plotly_chart(fig, use_container_width=True)
         
@@ -313,7 +368,7 @@ def display_analysis_results(analysis_data):
     # Experience level and summary
     exp_level = analysis_data.get('experience_level', {})
     summary = analysis_data.get('summary', {})
-    
+
     if exp_level or summary:
         st.subheader("📈 Profile Summary")
         
@@ -321,16 +376,21 @@ def display_analysis_results(analysis_data):
         
         with col1:
             if exp_level:
-                st.metric("📊 Experience Level", exp_level.get('level', 'Unknown').upper())
+                level = exp_level.get('level', 'Unknown').upper()
+                st.metric("📊 Experience", level[:10])  # Truncate long text
         
         with col2:
             if summary:
-                st.metric("💪 Profile Strength", summary.get('profile_strength', 'Unknown').upper())
+                strength = summary.get('profile_strength', 'Unknown').upper()
+                st.metric("💪 Strength", strength[:8])  # Truncate long text
         
         with col3:
             if summary:
                 salary = summary.get('salary_range_estimate', 'Not estimated')
-                st.metric("💰 Salary Estimate", salary)
+                # Truncate salary if too long
+                if len(salary) > 15:
+                    salary = salary[:12] + "..."
+                st.metric("💰 Salary", salary)
 
 def analytics_dashboard_page():
     """Analytics dashboard showing processed resumes"""
