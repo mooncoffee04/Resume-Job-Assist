@@ -160,14 +160,6 @@ def display_resume_from_database(resume_content_b64, resume_filename):
         st.info(f"**Size:** {file_size:,} bytes")
         st.info(f"**Type:** {file_extension}")
         
-        # Provide download button
-        st.download_button(
-            label="⬇️ Download Resume",
-            data=resume_content,
-            file_name=resume_filename,
-            mime="application/octet-stream",
-            use_container_width=True
-        )
         
         # Display content in browser based on file type
         if file_extension == '.pdf':
