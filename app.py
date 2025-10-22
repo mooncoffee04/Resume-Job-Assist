@@ -160,7 +160,8 @@ def process_resume(uploaded_file):
         # Step 3: Analyze with Gemini
         status_text.text("🧠 Step 3/3: Analyzing with Gemini AI...")
         
-        api_key = st.secrets.get('GEMINI_API_KEY') or os.getenv('GEMINI_API_KEY')
+        from secrets_helper import GEMINI_API_KEY
+        api_key = GEMINI_API_KEY
         if not api_key:
             st.error("❌ Gemini API key not found! Please set GEMINI_API_KEY in your environment.")
             return
@@ -357,12 +358,14 @@ def settings_page():
     # Environment variables status
     st.subheader("🌍 Environment Variables")
     
+    from secrets_helper import GEMINI_API_KEY, NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+
     env_vars = {
-    "GEMINI_API_KEY": st.secrets.get('GEMINI_API_KEY') or os.getenv('GEMINI_API_KEY'),
-    "NEO4J_URI": st.secrets.get('NEO4J_URI') or os.getenv('NEO4J_URI'),
-    "NEO4J_USER": st.secrets.get('NEO4J_USER') or os.getenv('NEO4J_USER'),
-    "NEO4J_PASSWORD": st.secrets.get('NEO4J_PASSWORD') or os.getenv('NEO4J_PASSWORD')
-}
+        "GEMINI_API_KEY": GEMINI_API_KEY,
+        "NEO4J_URI": NEO4J_URI,
+        "NEO4J_USER": NEO4J_USER,
+        "NEO4J_PASSWORD": NEO4J_PASSWORD
+    }
     
     for var, value in env_vars.items():
         if value:
