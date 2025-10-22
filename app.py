@@ -142,6 +142,54 @@ def simple_auth():
     
     return True
 
+def display_resume_from_database(resume_content_b64, resume_filename):
+    """Display resume content stored in database as base64"""
+    
+    st.header("📄 Original Resume")
+    
+    try:
+        import base64
+        
+        # Decode the base64 content
+        resume_content = base64.b64decode(resume_content_b64)
+        file_size = len(resume_content)
+        file_extension = Path(resume_filename).suffix.lower()
+        
+        st.success("✅ Resume loaded from database (deployment-friendly storage)")
+        st.info(f"**File:** {resume_filename}")
+        st.info(f"**Size:** {file_size:,} bytes")
+        st.info(f"**Type:** {file_extension}")
+        
+        # Provide download button
+        st.download_button(
+            label="⬇️ Download Resume",
+            data=resume_content,
+            file_name=resume_filename,
+            mime="application/octet-stream",
+            use_container_width=True
+        )
+        
+        # Try to display content based on file type
+        if file_extension == '.pdf':
+            st.info("📖 PDF file ready for download. Click the download button above to view it.")
+            
+        elif file_extension in ['.txt']:
+            st.subheader("📝 Text Content:")
+            try:
+                content = resume_content.decode('utf-8')
+                st.text_area("Resume Content", content, height=400, disabled=True)
+            except UnicodeDecodeError:
+                st.warning("Could not decode text content for preview")
+                
+        elif file_extension in ['.docx']:
+            st.info("📄 Word document ready for download. Click the download button above to view it.")
+            
+        else:
+            st.info("File ready for download. Click the download button above to view it.")
+            
+    except Exception as e:
+        st.error(f"Error displaying resume from database: {e}")
+
 def display_original_resume(resume_file_path):
     """Display the original resume file"""
     
@@ -150,27 +198,45 @@ def display_original_resume(resume_file_path):
     try:
         file_path = Path(resume_file_path)
         
+        # Show file info regardless of existence
+        st.info(f"**File:** {file_path.name}")
+        st.info(f"**Stored Path:** {resume_file_path}")
+        
         if not file_path.exists():
-            st.error("Resume file not found. It may have been moved or deleted.")
+            st.error("⚠️ Resume file not found in deployment environment.")
+            st.info("💡 **Note:** In deployed apps, uploaded files may not persist between sessions. The file was uploaded but may have been cleared by the hosting platform.")
+            
+            # Suggest alternatives
+            st.markdown("""
+            **Possible solutions:**
+            1. Re-upload your resume to get a fresh analysis
+            2. Download was likely successful when you first uploaded
+            3. Files in cloud deployments are typically temporary
+            """)
             return
         
-        # Get file info
+        # Get file info if file exists
         file_size = file_path.stat().st_size
         file_extension = file_path.suffix.lower()
         
-        st.info(f"**File:** {file_path.name}")
         st.info(f"**Size:** {file_size:,} bytes")
         st.info(f"**Type:** {file_extension}")
         
         # Provide download button
-        with open(file_path, 'rb') as file:
-            st.download_button(
-                label="⬇️ Download Resume",
-                data=file.read(),
-                file_name=file_path.name,
-                mime="application/octet-stream",
-                use_container_width=True
-            )
+        try:
+            with open(file_path, 'rb') as file:
+                file_data = file.read()
+                st.download_button(
+                    label="⬇️ Download Resume",
+                    data=file_data,
+                    file_name=file_path.name,
+                    mime="application/octet-stream",
+                    use_container_width=True
+                )
+                st.success("✅ File found and ready for download!")
+        except Exception as e:
+            st.error(f"❌ Could not read file for download: {e}")
+            return
         
         # Try to display content based on file type
         if file_extension == '.pdf':
@@ -178,9 +244,12 @@ def display_original_resume(resume_file_path):
             
         elif file_extension in ['.txt']:
             st.subheader("📝 Text Content:")
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                st.text_area("Resume Content", content, height=400, disabled=True)
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    st.text_area("Resume Content", content, height=400, disabled=True)
+            except Exception as e:
+                st.error(f"Could not read text content: {e}")
                 
         elif file_extension in ['.docx']:
             st.info("📄 Word documents can be downloaded and viewed in Microsoft Word or similar applications.")
@@ -211,6 +280,7 @@ def display_original_resume(resume_file_path):
             
     except Exception as e:
         st.error(f"Error displaying resume: {e}")
+        st.info("💡 This is likely because the deployment environment doesn't persist uploaded files.")
 
 def show_user_analyses():
     """Show user's saved resume analyses"""
@@ -228,7 +298,9 @@ def show_user_analyses():
                 MATCH (u:User {email: $email})-[:HAS_ANALYSIS]->(a:Analysis)
                 RETURN a.id as id, a.created_at as created_at, 
                        a.data as data, a.resume_name as name,
-                       a.resume_file_path as resume_file_path
+                       a.resume_file_path as resume_file_path,
+                       a.resume_content_b64 as resume_content_b64,
+                       a.resume_filename as resume_filename
                 ORDER BY a.created_at DESC
             """, {'email': user_email})
             
@@ -244,6 +316,8 @@ def show_user_analyses():
                 created_at = analysis['created_at']
                 name = analysis['name'] or "Unknown"
                 resume_file_path = analysis.get('resume_file_path')
+                resume_content_b64 = analysis.get('resume_content_b64')
+                resume_filename = analysis.get('resume_filename')
                 
                 with st.expander(f"{name} - {str(created_at)[:19]}"):
                     # Create columns for better button layout
@@ -257,22 +331,22 @@ def show_user_analyses():
                             st.rerun()
                     
                     with col2:
-                        # Debug resume file path
-                        if resume_file_path:
-                            file_exists = Path(resume_file_path).exists() if resume_file_path else False
-                            if file_exists:
-                                if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
-                                    # Set a session state flag to show resume outside expander
-                                    st.session_state[f"show_resume_{analysis['id']}"] = True
-                                    st.session_state.current_resume_path = resume_file_path
-                                    st.rerun()
-                            else:
-                                # Show debug info for missing files
-                                if st.button(f"📄 Resume Missing", key=f"resume_missing_{analysis['id']}", disabled=True, use_container_width=True):
-                                    pass
-                                st.caption(f"Path: {resume_file_path}")
+                        # Check if we have resume content in database or file path
+                        has_resume_content = resume_content_b64 is not None
+                        has_resume_file = resume_file_path and Path(resume_file_path).exists() if resume_file_path else False
+                        
+                        if has_resume_content or has_resume_file:
+                            if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
+                                # Set session state for resume viewing
+                                st.session_state[f"show_resume_{analysis['id']}"] = True
+                                st.session_state.current_resume_path = resume_file_path
+                                st.session_state.current_resume_content_b64 = resume_content_b64
+                                st.session_state.current_resume_filename = resume_filename
+                                st.rerun()
                         else:
                             st.button(f"📄 Resume N/A", key=f"resume_na_{analysis['id']}", disabled=True, use_container_width=True)
+                            if resume_file_path:
+                                st.caption(f"Path: {resume_file_path}")
                     
                     with col3:
                         if st.button(f"🗑️ Delete", key=f"delete_{analysis['id']}", type="secondary", use_container_width=True):
@@ -313,13 +387,28 @@ def show_user_analyses():
                 resume_key = f"show_resume_{analysis['id']}"
                 if st.session_state.get(resume_key, False):
                     st.markdown("---")
-                    display_original_resume(st.session_state.current_resume_path)
+                    
+                    # Check if we have content in database vs file path
+                    resume_content_b64 = st.session_state.get('current_resume_content_b64')
+                    resume_filename = st.session_state.get('current_resume_filename') 
+                    resume_path = st.session_state.get('current_resume_path')
+                    
+                    if resume_content_b64 and resume_filename:
+                        # Display resume from database content
+                        display_resume_from_database(resume_content_b64, resume_filename)
+                    elif resume_path:
+                        # Display resume from file path
+                        display_original_resume(resume_path)
+                    else:
+                        st.error("No resume content available")
                     
                     # Add a button to hide the resume
                     if st.button("❌ Hide Resume", key=f"hide_resume_{analysis['id']}"):
                         st.session_state[resume_key] = False
-                        if 'current_resume_path' in st.session_state:
-                            del st.session_state.current_resume_path
+                        # Clean up session state
+                        for key in ['current_resume_path', 'current_resume_content_b64', 'current_resume_filename']:
+                            if key in st.session_state:
+                                del st.session_state[key]
                         st.rerun()
                     break  # Only show one resume at a time
             
@@ -505,6 +594,20 @@ def try_neo4j_storage(adapted_data, resume_file_path=None):
         from connection import init_neo4j, neo4j_connection
         init_neo4j()
         
+        # Try to store resume content as base64 for deployment environments
+        resume_content_b64 = None
+        resume_filename = None
+        
+        if resume_file_path and Path(resume_file_path).exists():
+            try:
+                with open(resume_file_path, 'rb') as f:
+                    import base64
+                    resume_content_b64 = base64.b64encode(f.read()).decode('utf-8')
+                    resume_filename = Path(resume_file_path).name
+                st.info("📦 Resume content stored in database for deployment compatibility")
+            except Exception as e:
+                st.warning(f"Could not store resume content: {e}")
+        
         with neo4j_connection.get_session() as session:
             # Create analysis record linked to user
             analysis_id = str(uuid.uuid4())
@@ -515,7 +618,9 @@ def try_neo4j_storage(adapted_data, resume_file_path=None):
                     created_at: datetime(),
                     data: $analysis_data,
                     resume_name: $resume_name,
-                    resume_file_path: $resume_file_path
+                    resume_file_path: $resume_file_path,
+                    resume_content_b64: $resume_content_b64,
+                    resume_filename: $resume_filename
                 })
                 CREATE (u)-[:HAS_ANALYSIS]->(a)
                 RETURN a
@@ -524,7 +629,9 @@ def try_neo4j_storage(adapted_data, resume_file_path=None):
                 'analysis_id': analysis_id,
                 'analysis_data': json.dumps(adapted_data),
                 'resume_name': adapted_data.get('personal_info', {}).get('name', 'Unknown'),
-                'resume_file_path': resume_file_path
+                'resume_file_path': resume_file_path,
+                'resume_content_b64': resume_content_b64,
+                'resume_filename': resume_filename
             })
             
         st.success(f"Analysis saved to your profile!")
