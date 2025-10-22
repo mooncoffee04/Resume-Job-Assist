@@ -1,0 +1,24 @@
+# Core dependencies
+streamlit>=1.28.0
+pandas>=1.5.0
+plotly>=5.15.0
+
+# Resume processing
+PyPDF2>=3.0.1
+python-docx>=0.8.11
+python-dotenv>=1.0.0
+
+# AI/ML
+google-generativeai>=0.3.0
+
+# Database
+neo4j>=5.13.0
+
+# File handling
+pathlib2>=2.3.7
+tempfile36>=1.0
+
+# Utilities
+uuid>=1.30
+datetime
+json5>=0.9.6

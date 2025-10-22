@@ -1,0 +1,63 @@
+Laavanya Mishra
+BTech Data Science 2022 -2026
+Date of Birth: 01/01/2004
+Education ______________________________________________________________ ______________ ___________________
+MPSTME, NMIMS University 2022-2026
+B.Tech in Data Science
+CGPA: 3.66
+RN Podar School 2019 -2021
+CBSE : 85.5
+Podar International School 2019
+CBSE: 9 5.8
+Projects ____________________________________________________________________________ ____________________________
+Multimodal Clinical Insight Assistant (Neo4j + SeaweedFS Blob Storage deployed on Docker + Streamlit)
+Built a fully working web app that allows doctor to login and access assigned patient cases. The doctor can retrieve medical records through
+a simple text or voice command, supports all CRUD operations for lab reports, scan reports and generate a structure d SOAP note with the
+help of a Gemini agent in the backend which is HIPAA and GDPR complaint. Efficiently store all records of the patient on Neo4 j Aura.
+Breast Cancer Classification of DNA Sequences (Draft Paper Accepted)
+Wrote a research paper and devised a classification model incorporating a combined Machine Learning and Deep Learning approac h to
+classify forward and backward DNA sequences of cancerous and non -cancerous nature. This project proposes a non -invasive cancer
+detection method.
+Hospital Booking Management System (Django)
+Developed a full -stack hospital appointment booking system using Django. Implemented secure user authentication and validation for
+registration/login. Appointment slots are dynamically displayed based on doctor availability and updated in real -time post -booking. Ensured
+smooth and intuitive scheduling flow for both patients and doctors.
+Posture Check and Corrector (MediaPipe, SVM)
+Built a desktop application using MediaPipe for real -time posture detection and correction. Trained a Support Vector Machine (SVM) on
+body landmarks to identify slouching behavior. Users receive instant alerts when improper posture is detected. The app was compiled into
+a lightweight .exe for offline use.
+MBTI Personality Predictor (Random Forest)
+Developed an MBTI personality prediction model using a Random Forest classifier trained on labeled text data. Focused on inte rpretability
+by extracting the top 25 most important linguistic features contributing to each personality type. Combined predictive modeling with
+explainable AI to offer both classification and insightful personality analysis.
+Effect of various factors on student’s examination grades
+Project done using a survey conducted, and questions regarding their environment, study hours, health, motivation, location of study were
+considered. ANOVA was conducted on these factors
+Internships ____________________________________________________________________________ ___________________
+Compserve April 2025 - Current
+Working on building a college management system, exploring PgSQL and Redis Framework
+Vrijesh Natural Fibre and Fabrics - AI Intern July 2025 - Current
+Working on automation of defect detection in textiles + making AI agents for managing bills and SAP
+Medmitra AI - Engineering Intern August 2025 - Current
+Building a doctor & patient facing medical platform to standardize Indian Healthcare.
+Certifications & Publications____ ________________________________________________ ______ __________
+ExcelR Data Analyst Certification
+Excel, Tableau, PowerBI and MySQL
+ExcelR Data Science Certification
+CORE SKILLS__________________________________________________ _____________ ___________________
+Technical Skills :
+Statistics, ML, AI, AWS Cloud, R, Python, SQL, HTML & CSS, Javascript (basics), NumPy, Pandas, Tensorflow, Matplotlib, OpenCV, Keras,
+Seaborn, Streamlit, Docker, Neo4j, Excel, Tableau, PowerBI
+Soft Skills :
+Analytical thinking, Problem solving, Critical thinking, Communication, Data storytelling, Teamwork, Collaboration, Adaptabil ity, Creativity,
+Curiosity, Attention to detail & Project management.
+Achievements and Positions of Responsibility _______________________ _____________ ___________________
+EkaCare’s Hackathon [ Ekathon 2025 ]
+Bagged the first prize by building EkaMediBridge, a platform that provides a voice assistant that takes care of the patient’s chief complaint
+and automatically generated a SNOMED CT standardized clinical note for the doctor’s review. Along with preparing a formal prescription
+from the doctor’s voice. Closely worked with Eka Care’s APIs for seamless integration to patient & doctor profiles on Aadhar Cards under
+ABDM (Ayushman Bharat Digital Mission) Connect
+Sub-Head, Taqneeq [Technical Fest]
+Managed announcement messages and social media planning & led event ideation and planning.
+Team Member, Darvin for IGVC [International Ground Vehicle Competition]
+Managing project reports & sponsorship proposal

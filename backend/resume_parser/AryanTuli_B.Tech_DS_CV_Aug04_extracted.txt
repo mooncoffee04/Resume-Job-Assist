@@ -1,0 +1,52 @@
+Aryan Tuli
+BTech Data Science (Batch: J1)
+Date of Birth: 23/12/2003
+Education ______________________________________________________________ ___
+MPSTME, NMIMS University 2022 - 2026
+B. Tech in Data Science
+CGPA: 3.4/4
+Narayana E -techno Junior College 2020 - 2022
+CBSE : 76 %
+Ryan International School 2020
+ICSE : 92 %
+Projects_________________________________________________________ __
+Chart and Table extraction from documents - 2025
+Trained a Yolo model on a large dataset named Pub LayNet to be able to extract charts , tables and other
+graph ics from any document, this was tested mainly on financial documents where the extracted charts and
+images were filtered using a set of keywords.
+Bird Detection and Classification - 2025
+Developed and deployed a full -stack AI application using a Flask API to serve a YOLOv8m model. Integrated a
+Gemini -powered generative AI chatbot to translate model outputs into contextual, natural -language insights
+for users .
+Automated Attendance Marker - 2024
+Developed an automated attendance system using the FaceNet model, where facial embeddings from student
+images were used to recognize and mark attendance in real -time. The system generated downloadable CSV
+files, streamlining attendance tracking for classroom settings .
+Student Housing Market Analysis - 2025
+Conducted an in -depth market study on India’s evolving student housing sector, analyzing survey data and
+applying frameworks like SWOT, Porter's Five Forces, and Conjoint Analysis to identify key student preferences
+and unmet needs.
+Hackathon Registration Website - 2024
+Designed and implemented a full -stack web application using Django to manage hackathon registrations,
+including user authentication, form handling, and an admin dashboard.
+Internships________________________________________________________ __
+Rockmetric : June 2025 – Ongoing (Research Intern)
+Evaluat ing how modern AI/LLM -augmented platforms empower non -technical business users in the
+consumer goods sector to independently perform business monitoring.
+CollegeStreet.tech : Feb 2025 – July 2025 (Project Intern)
+Engineered sophisticated prompts for the Llama model (via Grok API) to automate financial report
+generation, effectively translating structured financial data into narrative summaries .
+Certifications & Publications__________________________________________________
+• Coursera - Deep Learning Specialization (Andrew NG) – August 2024
+• Udemy - 15 Days of SQL: The Complete SQL Masterclass 2025 – August 2025
+• Udemy - PL-300 certification prep: Microsoft Power BI Data Analyst – August 2025
+CORE SKILLS__________________________________________________
+Programming Languages: Python, SQL, HTML and CSS.
+Libraries and Frameworks: NumPy, Pandas, Matplotlib, Seaborn, Keras, Tensorflow, Scikit -learn, OpenCV,
+Streamlit
+Data Analysis Tools: Excel, Power BI
+Concepts : Statistics, Machine Learning, Deep Learning, Time Series Analysis, Cloud (AWS (Surface level) )
+Additional Skills: Photography (Automotive and Wildlife), Adobe Lightroom, Adobe Photoshop
+Languages: English, Hindi, German(upto A1 level)
+Achievements and Positions of Responsibility _______________________________
+• Head of Photography in Analytika, a Data Science committee (2023 -2024)
