@@ -257,12 +257,20 @@ def show_user_analyses():
                             st.rerun()
                     
                     with col2:
-                        if resume_file_path and Path(resume_file_path).exists():
-                            if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
-                                # Set a session state flag to show resume outside expander
-                                st.session_state[f"show_resume_{analysis['id']}"] = True
-                                st.session_state.current_resume_path = resume_file_path
-                                st.rerun()
+                        # Debug resume file path
+                        if resume_file_path:
+                            file_exists = Path(resume_file_path).exists() if resume_file_path else False
+                            if file_exists:
+                                if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
+                                    # Set a session state flag to show resume outside expander
+                                    st.session_state[f"show_resume_{analysis['id']}"] = True
+                                    st.session_state.current_resume_path = resume_file_path
+                                    st.rerun()
+                            else:
+                                # Show debug info for missing files
+                                if st.button(f"📄 Resume Missing", key=f"resume_missing_{analysis['id']}", disabled=True, use_container_width=True):
+                                    pass
+                                st.caption(f"Path: {resume_file_path}")
                         else:
                             st.button(f"📄 Resume N/A", key=f"resume_na_{analysis['id']}", disabled=True, use_container_width=True)
                     
@@ -456,12 +464,15 @@ def process_resume(uploaded_file):
                 
                 # Save the original resume file
                 resume_file = save_resume_file(uploaded_file)
-                st.info(f"📄 Resume saved to: {resume_file}")
+                if resume_file:
+                    st.info(f"📄 Resume saved to: {resume_file}")
+                else:
+                    st.warning("📄 Resume file could not be saved (analysis still available)")
                 
                 # Try to save to Neo4j if available and user is authenticated
                 if st.session_state.get('authenticated'):
                     with st.spinner("💾 Saving to your profile..."):
-                        try_neo4j_storage(adapted_data, str(resume_file))
+                        try_neo4j_storage(adapted_data, str(resume_file) if resume_file else None)
                 
             except Exception as analysis_error:
                 st.error(f"❌ AI analysis failed: {analysis_error}")
@@ -697,19 +708,84 @@ def analytics_dashboard_page():
     """Analytics dashboard showing processed resumes"""
     
     st.header("📈 Analytics Dashboard")
-    st.info("🚧 Coming soon! This will show insights from all processed resumes.")
     
-    # Show sample metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("👥 Resumes Processed", "15")
-    with col2:
-        st.metric("🛠️ Unique Skills Found", "89")
-    with col3:
-        st.metric("🚀 Projects Analyzed", "47")
-    with col4:
-        st.metric("💼 Companies Mentioned", "12")
+    try:
+        from connection import init_neo4j, neo4j_connection
+        init_neo4j()
+        
+        with neo4j_connection.get_session() as session:
+            # Get total analyses count
+            analyses_result = session.run("MATCH (a:Analysis) RETURN count(a) as total_analyses")
+            total_analyses = analyses_result.single()['total_analyses']
+            
+            # Get unique users count
+            users_result = session.run("MATCH (u:User) RETURN count(u) as total_users")
+            total_users = users_result.single()['total_users']
+            
+            # Get unique skills count (approximate from analysis data)
+            skills_result = session.run("""
+                MATCH (a:Analysis)
+                WITH a.data as analysis_data
+                WHERE analysis_data IS NOT NULL
+                RETURN count(a) as analyses_with_skills
+            """)
+            analyses_with_skills = skills_result.single()['analyses_with_skills']
+            
+            # Estimate unique skills (rough calculation)
+            estimated_skills = analyses_with_skills * 12  # Average skills per resume
+            
+            # Get analyses from last 30 days
+            recent_result = session.run("""
+                MATCH (a:Analysis)
+                WHERE a.created_at >= datetime() - duration('P30D')
+                RETURN count(a) as recent_analyses
+            """)
+            recent_analyses = recent_result.single()['recent_analyses']
+        
+        # Show metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("📊 Total Analyses", total_analyses)
+        with col2:
+            st.metric("👥 Registered Users", total_users)
+        with col3:
+            st.metric("🛠️ Est. Skills Found", estimated_skills)
+        with col4:
+            st.metric("📅 Recent (30 days)", recent_analyses)
+        
+        # Additional insights
+        if total_analyses > 0:
+            st.markdown("---")
+            st.subheader("📊 Insights")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                avg_per_user = total_analyses / max(total_users, 1)
+                st.metric("📈 Avg Analyses per User", f"{avg_per_user:.1f}")
+            
+            with col2:
+                if recent_analyses > 0:
+                    st.metric("🔥 Activity Level", "Active" if recent_analyses >= 5 else "Moderate")
+                else:
+                    st.metric("🔥 Activity Level", "Low")
+        
+    except Exception as e:
+        st.error(f"Error loading analytics: {e}")
+        # Fallback to static numbers
+        st.info("🚧 Using sample data - database connection issue")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("📊 Total Analyses", "0")
+        with col2:
+            st.metric("👥 Registered Users", "0") 
+        with col3:
+            st.metric("🛠️ Est. Skills Found", "0")
+        with col4:
+            st.metric("📅 Recent (30 days)", "0")
 
 def settings_page():
     """Settings and configuration page"""
@@ -745,9 +821,31 @@ def settings_page():
 def save_resume_file(uploaded_file):
     """Save the uploaded resume file to local storage"""
     
-    # Create resumes directory if it doesn't exist
-    resumes_dir = Path("resumes")
-    resumes_dir.mkdir(exist_ok=True)
+    # Try to create resumes directory in multiple possible locations
+    possible_dirs = [
+        Path("resumes"),
+        Path("/tmp/resumes"),
+        Path.home() / "resumes",
+        Path("/app/resumes")  # Common in containerized deployments
+    ]
+    
+    resumes_dir = None
+    for dir_path in possible_dirs:
+        try:
+            dir_path.mkdir(exist_ok=True, parents=True)
+            # Test if we can write to this directory
+            test_file = dir_path / "test_write.tmp"
+            test_file.write_text("test")
+            test_file.unlink()
+            resumes_dir = dir_path
+            break
+        except Exception:
+            continue
+    
+    if not resumes_dir:
+        # Fallback to temp directory
+        resumes_dir = Path(tempfile.gettempdir()) / "resumes"
+        resumes_dir.mkdir(exist_ok=True)
     
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -755,11 +853,17 @@ def save_resume_file(uploaded_file):
     base_name = Path(uploaded_file.name).stem
     resume_filename = resumes_dir / f"{base_name}_{timestamp}{file_extension}"
     
-    # Save the file
-    with open(resume_filename, 'wb') as f:
-        f.write(uploaded_file.getvalue())
-    
-    return resume_filename
+    try:
+        # Save the file
+        with open(resume_filename, 'wb') as f:
+            f.write(uploaded_file.getvalue())
+        
+        st.info(f"📄 Resume saved to: {resume_filename}")
+        return resume_filename
+        
+    except Exception as e:
+        st.warning(f"Could not save resume file: {e}")
+        return None
 
 def save_results_to_file(data, original_filename):
     """Save analysis results to a JSON file"""
