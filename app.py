@@ -155,7 +155,7 @@ def display_resume_from_database(resume_content_b64, resume_filename):
         file_size = len(resume_content)
         file_extension = Path(resume_filename).suffix.lower()
         
-        st.success("✅ Resume loaded from database (deployment-friendly storage)")
+        st.success("✅ Resume loaded from database")
         st.info(f"**File:** {resume_filename}")
         st.info(f"**Size:** {file_size:,} bytes")
         st.info(f"**Type:** {file_extension}")
@@ -169,23 +169,64 @@ def display_resume_from_database(resume_content_b64, resume_filename):
             use_container_width=True
         )
         
-        # Try to display content based on file type
+        # Display content in browser based on file type
         if file_extension == '.pdf':
-            st.info("📖 PDF file ready for download. Click the download button above to view it.")
+            st.subheader("📖 PDF Viewer")
+            # Display PDF directly in browser using base64
+            pdf_base64 = base64.b64encode(resume_content).decode('utf-8')
+            pdf_display = f"""
+            <iframe src="data:application/pdf;base64,{pdf_base64}" 
+                    width="100%" height="800px" type="application/pdf">
+                <p>Your browser doesn't support PDF viewing. 
+                   <a href="data:application/pdf;base64,{pdf_base64}" download="{resume_filename}">
+                   Click here to download the PDF</a>
+                </p>
+            </iframe>
+            """
+            st.markdown(pdf_display, unsafe_allow_html=True)
             
         elif file_extension in ['.txt']:
             st.subheader("📝 Text Content:")
             try:
                 content = resume_content.decode('utf-8')
-                st.text_area("Resume Content", content, height=400, disabled=True)
+                st.text_area("Resume Content", content, height=600, disabled=True)
             except UnicodeDecodeError:
                 st.warning("Could not decode text content for preview")
                 
         elif file_extension in ['.docx']:
-            st.info("📄 Word document ready for download. Click the download button above to view it.")
+            st.subheader("📄 Word Document")
+            st.info("Word documents cannot be displayed directly in browser, but you can download it above.")
             
+            # Try to extract and show text content
+            try:
+                # Save temporarily to extract text
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
+                    tmp_file.write(resume_content)
+                    tmp_file_path = tmp_file.name
+                
+                from text_extractor import DocumentTextExtractor
+                extractor = DocumentTextExtractor()
+                extraction_result = extractor.extract_text(tmp_file_path)
+                
+                # Handle tuple return (text, metadata) or just text
+                if isinstance(extraction_result, tuple):
+                    extracted_text = extraction_result[0]
+                else:
+                    extracted_text = extraction_result
+                
+                if extracted_text:
+                    st.subheader("📝 Text Preview:")
+                    st.text_area("Extracted Content", extracted_text, height=600, disabled=True)
+                
+                # Clean up temp file
+                import os
+                os.unlink(tmp_file_path)
+                        
+            except Exception as e:
+                st.warning(f"Could not extract text for preview: {e}")
         else:
-            st.info("File ready for download. Click the download button above to view it.")
+            st.info("File type not supported for browser viewing. You can download it above.")
             
     except Exception as e:
         st.error(f"Error displaying resume from database: {e}")
@@ -209,9 +250,8 @@ def display_original_resume(resume_file_path):
             # Suggest alternatives
             st.markdown("""
             **Possible solutions:**
-            1. Re-upload your resume to get a fresh analysis
-            2. Download was likely successful when you first uploaded
-            3. Files in cloud deployments are typically temporary
+            1. Re-upload your resume to get a fresh analysis with in-browser viewing
+            2. Files in cloud deployments are typically temporary
             """)
             return
         
@@ -238,21 +278,39 @@ def display_original_resume(resume_file_path):
             st.error(f"❌ Could not read file for download: {e}")
             return
         
-        # Try to display content based on file type
+        # Display content in browser based on file type
         if file_extension == '.pdf':
-            st.info("📖 PDF files can be downloaded and viewed in your browser or PDF reader.")
+            st.subheader("📖 PDF Viewer")
+            try:
+                import base64
+                with open(file_path, 'rb') as file:
+                    pdf_content = file.read()
+                    pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
+                    pdf_display = f"""
+                    <iframe src="data:application/pdf;base64,{pdf_base64}" 
+                            width="100%" height="800px" type="application/pdf">
+                        <p>Your browser doesn't support PDF viewing. 
+                           <a href="data:application/pdf;base64,{pdf_base64}" download="{file_path.name}">
+                           Click here to download the PDF</a>
+                        </p>
+                    </iframe>
+                    """
+                    st.markdown(pdf_display, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Could not display PDF: {e}")
             
         elif file_extension in ['.txt']:
             st.subheader("📝 Text Content:")
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    st.text_area("Resume Content", content, height=400, disabled=True)
+                    st.text_area("Resume Content", content, height=600, disabled=True)
             except Exception as e:
                 st.error(f"Could not read text content: {e}")
                 
         elif file_extension in ['.docx']:
-            st.info("📄 Word documents can be downloaded and viewed in Microsoft Word or similar applications.")
+            st.subheader("📄 Word Document")
+            st.info("Word documents cannot be displayed directly in browser, but you can download it above.")
             
             # Try to extract text for preview (optional)
             try:
@@ -268,15 +326,12 @@ def display_original_resume(resume_file_path):
                 
                 if extracted_text:
                     st.subheader("📝 Text Preview:")
-                    st.text_area("Extracted Content", extracted_text[:2000] + ("..." if len(extracted_text) > 2000 else ""), 
-                               height=300, disabled=True)
-                    if len(extracted_text) > 2000:
-                        st.info("Showing first 2000 characters. Download the file to view complete content.")
+                    st.text_area("Extracted Content", extracted_text, height=600, disabled=True)
                         
             except Exception as e:
                 st.warning(f"Could not extract text for preview: {e}")
         else:
-            st.info("File type not supported for preview. You can download it to view the content.")
+            st.info("File type not supported for browser viewing. You can download it above.")
             
     except Exception as e:
         st.error(f"Error displaying resume: {e}")
