@@ -13,6 +13,8 @@ from datetime import datetime
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
+import hashlib
+import uuid
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +30,295 @@ try:
     NEO4J_STORAGE_AVAILABLE = True
 except ImportError:
     NEO4J_STORAGE_AVAILABLE = False
+
+def authenticate_user(email, password):
+    """Check user credentials in Neo4j"""
+    try:
+        from connection import init_neo4j, neo4j_connection
+        init_neo4j()
+        
+        with neo4j_connection.get_session() as session:
+            result = session.run("""
+                MATCH (u:User {email: $email})
+                RETURN u.password_hash as hash, u.salt as salt
+            """, {'email': email})
+            
+            record = result.single()
+            if record:
+                stored_hash = record['hash']
+                salt = record['salt']
+                input_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+                return stored_hash == input_hash.hex()
+            
+    except Exception as e:
+        st.error(f"Authentication error: {e}")
+    
+    return False
+
+def register_user(email, password, name):
+    """Register new user in Neo4j"""
+    try:
+        from connection import init_neo4j, neo4j_connection
+        init_neo4j()
+        
+        # Generate salt and hash password
+        salt = str(uuid.uuid4())
+        password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+        
+        with neo4j_connection.get_session() as session:
+            # Check if user exists
+            existing = session.run("MATCH (u:User {email: $email}) RETURN u", {'email': email}).single()
+            if existing:
+                return False
+            
+            # Create user
+            session.run("""
+                CREATE (u:User {
+                    id: $id,
+                    email: $email,
+                    name: $name,
+                    password_hash: $password_hash,
+                    salt: $salt,
+                    created_at: datetime(),
+                    updated_at: datetime()
+                })
+            """, {
+                'id': str(uuid.uuid4()),
+                'email': email,
+                'name': name,
+                'password_hash': password_hash,
+                'salt': salt
+            })
+            
+            return True
+            
+    except Exception as e:
+        st.error(f"Registration error: {e}")
+        return False
+
+def simple_auth():
+    """Simple email + password authentication"""
+    
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+        st.session_state.user_email = None
+    
+    if not st.session_state.authenticated:
+        st.title("🚀 Resume Intelligence AI")
+        st.subheader("Please login or create an account to continue")
+        
+        tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
+        
+        with tab1:
+            st.subheader("Welcome Back!")
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
+            
+            if st.button("Login", type="primary"):
+                if authenticate_user(email, password):
+                    st.session_state.authenticated = True
+                    st.session_state.user_email = email
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials")
+        
+        with tab2:
+            st.subheader("Create Your Account")
+            st.info("Join to save your resume analysis and track your progress!")
+            reg_email = st.text_input("Email", key="reg_email")
+            reg_password = st.text_input("Password", type="password", key="reg_password")
+            reg_name = st.text_input("Full Name", key="reg_name")
+            
+            if st.button("Create Account", type="primary"):
+                if reg_email and reg_password and reg_name:
+                    if register_user(reg_email, reg_password, reg_name):
+                        st.success("Account created successfully! Please switch to the Login tab.")
+                    else:
+                        st.error("Registration failed - email may already exist")
+                else:
+                    st.error("Please fill in all fields")
+        
+        return False
+    
+    return True
+
+def display_original_resume(resume_file_path):
+    """Display the original resume file"""
+    
+    st.header("📄 Original Resume")
+    
+    try:
+        file_path = Path(resume_file_path)
+        
+        if not file_path.exists():
+            st.error("Resume file not found. It may have been moved or deleted.")
+            return
+        
+        # Get file info
+        file_size = file_path.stat().st_size
+        file_extension = file_path.suffix.lower()
+        
+        st.info(f"**File:** {file_path.name}")
+        st.info(f"**Size:** {file_size:,} bytes")
+        st.info(f"**Type:** {file_extension}")
+        
+        # Provide download button
+        with open(file_path, 'rb') as file:
+            st.download_button(
+                label="⬇️ Download Resume",
+                data=file.read(),
+                file_name=file_path.name,
+                mime="application/octet-stream",
+                use_container_width=True
+            )
+        
+        # Try to display content based on file type
+        if file_extension == '.pdf':
+            st.info("📖 PDF files can be downloaded and viewed in your browser or PDF reader.")
+            
+        elif file_extension in ['.txt']:
+            st.subheader("📝 Text Content:")
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                st.text_area("Resume Content", content, height=400, disabled=True)
+                
+        elif file_extension in ['.docx']:
+            st.info("📄 Word documents can be downloaded and viewed in Microsoft Word or similar applications.")
+            
+            # Try to extract text for preview (optional)
+            try:
+                from text_extractor import DocumentTextExtractor
+                extractor = DocumentTextExtractor()
+                extraction_result = extractor.extract_text(str(file_path))
+                
+                # Handle tuple return (text, metadata) or just text
+                if isinstance(extraction_result, tuple):
+                    extracted_text = extraction_result[0]
+                else:
+                    extracted_text = extraction_result
+                
+                if extracted_text:
+                    st.subheader("📝 Text Preview:")
+                    st.text_area("Extracted Content", extracted_text[:2000] + ("..." if len(extracted_text) > 2000 else ""), 
+                               height=300, disabled=True)
+                    if len(extracted_text) > 2000:
+                        st.info("Showing first 2000 characters. Download the file to view complete content.")
+                        
+            except Exception as e:
+                st.warning(f"Could not extract text for preview: {e}")
+        else:
+            st.info("File type not supported for preview. You can download it to view the content.")
+            
+    except Exception as e:
+        st.error(f"Error displaying resume: {e}")
+
+def show_user_analyses():
+    """Show user's saved resume analyses"""
+    
+    st.header("My Saved Analyses")
+    
+    try:
+        from connection import init_neo4j, neo4j_connection
+        init_neo4j()
+        
+        user_email = st.session_state.user_email
+        
+        with neo4j_connection.get_session() as session:
+            result = session.run("""
+                MATCH (u:User {email: $email})-[:HAS_ANALYSIS]->(a:Analysis)
+                RETURN a.id as id, a.created_at as created_at, 
+                       a.data as data, a.resume_name as name,
+                       a.resume_file_path as resume_file_path
+                ORDER BY a.created_at DESC
+            """, {'email': user_email})
+            
+            analyses = list(result)
+            
+            if not analyses:
+                st.info("No saved analyses yet. Upload a resume to get started!")
+                return
+            
+            st.write(f"Found {len(analyses)} saved analyses:")
+            
+            for analysis in analyses:
+                created_at = analysis['created_at']
+                name = analysis['name'] or "Unknown"
+                resume_file_path = analysis.get('resume_file_path')
+                
+                with st.expander(f"{name} - {str(created_at)[:19]}"):
+                    # Create columns for better button layout
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        if st.button(f"📊 View Analysis", key=f"view_{analysis['id']}", use_container_width=True):
+                            # Set a session state flag to show analysis outside expander
+                            st.session_state[f"show_analysis_{analysis['id']}"] = True
+                            st.session_state.current_analysis_data = analysis['data']
+                            st.rerun()
+                    
+                    with col2:
+                        if resume_file_path and Path(resume_file_path).exists():
+                            if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
+                                # Set a session state flag to show resume outside expander
+                                st.session_state[f"show_resume_{analysis['id']}"] = True
+                                st.session_state.current_resume_path = resume_file_path
+                                st.rerun()
+                        else:
+                            st.button(f"📄 Resume N/A", key=f"resume_na_{analysis['id']}", disabled=True, use_container_width=True)
+                    
+                    with col3:
+                        if st.button(f"🗑️ Delete", key=f"delete_{analysis['id']}", type="secondary", use_container_width=True):
+                            # Delete the analysis using a separate session state to avoid conflicts
+                            try:
+                                with neo4j_connection.get_session() as delete_session:
+                                    delete_session.run("MATCH (a:Analysis {id: $id}) DETACH DELETE a", 
+                                                      {'id': analysis['id']})
+                                st.success("Analysis deleted!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting analysis: {e}")
+            
+            # Display analysis results outside expander for full width
+            for analysis in analyses:
+                analysis_key = f"show_analysis_{analysis['id']}"
+                if st.session_state.get(analysis_key, False):
+                    st.markdown("---")
+                    try:
+                        saved_data = json.loads(st.session_state.current_analysis_data)
+                        display_analysis_results(saved_data)
+                        
+                        # Add a button to hide the analysis
+                        if st.button("❌ Hide Analysis", key=f"hide_analysis_{analysis['id']}"):
+                            st.session_state[analysis_key] = False
+                            if 'current_analysis_data' in st.session_state:
+                                del st.session_state.current_analysis_data
+                            st.rerun()
+                            
+                    except json.JSONDecodeError as e:
+                        st.error(f"Error loading analysis data: {e}")
+                    except Exception as e:
+                        st.error(f"Error displaying analysis: {e}")
+                    break  # Only show one analysis at a time
+            
+            # Display resume outside expander for full width
+            for analysis in analyses:
+                resume_key = f"show_resume_{analysis['id']}"
+                if st.session_state.get(resume_key, False):
+                    st.markdown("---")
+                    display_original_resume(st.session_state.current_resume_path)
+                    
+                    # Add a button to hide the resume
+                    if st.button("❌ Hide Resume", key=f"hide_resume_{analysis['id']}"):
+                        st.session_state[resume_key] = False
+                        if 'current_resume_path' in st.session_state:
+                            del st.session_state.current_resume_path
+                        st.rerun()
+                    break  # Only show one resume at a time
+            
+    except Exception as e:
+        st.error(f"Error loading analyses: {e}")
+        import traceback
+        st.error(f"Detailed error: {traceback.format_exc()}")
 
 # Page config
 st.set_page_config(
@@ -66,135 +357,115 @@ st.markdown("""
 def main():
     """Main Streamlit app"""
     
-    # Header
-    st.markdown('<h1 class="main-header">🚀 Resume Intelligence AI</h1>', unsafe_allow_html=True)
-    st.info("**Transform your resume into actionable career insights!**  \nUpload your resume → AI extracts skills & experience → Get comprehensive analysis")
+    # Check authentication first
+    if not simple_auth():
+        return  # Show login/register forms
     
-    # Sidebar
-    with st.sidebar:
-        st.header("📊 Navigation")
-        page = st.selectbox("Choose a page:", [
-            "🏠 Upload & Process",
-            "📈 Analytics Dashboard", 
-            "🔧 Settings"
-        ])
+    # Sidebar navigation
+    st.sidebar.title("🚀 Resume AI")
+    st.sidebar.write(f"Welcome, {st.session_state.user_email}!")
     
-    # Route to different pages
-    if page == "🏠 Upload & Process":
-        upload_and_process_page()
-    elif page == "📈 Analytics Dashboard":
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.session_state.user_email = None
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    
+    # Navigation menu
+    page = st.sidebar.selectbox(
+        "📁 Choose a page:",
+        ["🏠 Upload & Analyze", "💾 My Saved Analyses", "📊 Analytics Dashboard", "⚙️ Settings"]
+    )
+    
+    if page == "🏠 Upload & Analyze":
+        upload_and_analyze_page()
+    elif page == "💾 My Saved Analyses":
+        show_user_analyses()
+    elif page == "📊 Analytics Dashboard":
         analytics_dashboard_page()
-    elif page == "🔧 Settings":
+    elif page == "⚙️ Settings":
         settings_page()
 
-def upload_and_process_page():
-    """Main upload and processing page"""
+def upload_and_analyze_page():
+    """Main upload and analysis page"""
     
-    st.header("📤 Upload Your Resume")
+    st.markdown('<h1 class="main-header">🚀 Resume Intelligence AI</h1>', unsafe_allow_html=True)
+    st.markdown("Upload a resume and get instant AI-powered analysis")
     
     # File upload
     uploaded_file = st.file_uploader(
-        "Choose your resume file",
-        type=['pdf', 'docx'],
-        help="Upload a PDF or DOCX resume file for AI-powered analysis"
+        "📄 Upload Resume (PDF, DOCX, TXT)",
+        type=['pdf', 'docx', 'txt'],
+        help="Upload your resume in PDF, Word, or text format"
     )
     
     if uploaded_file is not None:
-        # Show file details
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("📄 File Name", uploaded_file.name)
-        with col2:
-            st.metric("📊 File Size", f"{uploaded_file.size / 1024:.1f} KB")
-        with col3:
-            st.metric("📋 File Type", uploaded_file.type)
-        
-        # Process button
-        if st.button("🚀 Process Resume", type="primary", use_container_width=True):
-            process_resume(uploaded_file)
+        process_resume(uploaded_file)
 
 def process_resume(uploaded_file):
-    """Process the uploaded resume through the complete pipeline"""
+    """Process the uploaded resume"""
     
-    # Create progress bar
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    temp_file_path = None
     
     try:
-        # Step 1: Save uploaded file
-        status_text.text("📝 Step 1/3: Saving uploaded file...")
-        progress_bar.progress(10)
+        # Show file info
+        st.success(f"✅ File uploaded: {uploaded_file.name} ({uploaded_file.size} bytes)")
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             temp_file_path = tmp_file.name
         
-        progress_bar.progress(25)
+        # Extract text
+        with st.spinner("📖 Extracting text from document..."):
+            extractor = DocumentTextExtractor()
+            extraction_result = extractor.extract_text(temp_file_path)
+            
+            # Handle tuple return (text, metadata) or just text
+            if isinstance(extraction_result, tuple):
+                extracted_text = extraction_result[0]
+            else:
+                extracted_text = extraction_result
+            
+            if not extracted_text or not extracted_text.strip():
+                st.error("❌ No text could be extracted from the document")
+                return
+            
+            st.success(f"✅ Extracted {len(extracted_text)} characters")
         
-        # Step 2: Extract text
-        status_text.text("🔍 Step 2/3: Extracting text from document...")
-        
-        extractor = DocumentTextExtractor()
-        extracted_text, error = extractor.extract_text(temp_file_path)
-        
-        if error:
-            st.error(f"❌ Text extraction failed: {error}")
-            return
-        
-        progress_bar.progress(50)
-        
-        # Show text preview
-        with st.expander("📄 Extracted Text Preview"):
-            st.text_area(
-                "First 500 characters:",
-                extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
-                height=200
-            )
-        
-        # Step 3: Analyze with Gemini
-        status_text.text("🧠 Step 3/3: Analyzing with Gemini AI...")
-        
-        from secrets_helper import GEMINI_API_KEY
-        api_key = GEMINI_API_KEY
-        if not api_key:
-            st.error("❌ Gemini API key not found! Please set GEMINI_API_KEY in your environment.")
-            return
-        
-        analysis_results = extract_resume_with_gemini(extracted_text, api_key)
-        
-        if analysis_results.get('extraction_method') == 'fallback':
-            st.error(f"❌ Gemini analysis failed: {analysis_results.get('error')}")
-            return
-        
-        progress_bar.progress(100)
-        status_text.text("✅ Processing completed successfully!")
-        
-        # Adapt data structure
-        adapted_data = adapt_gemini_output_for_neo4j(analysis_results)
-        
-        # Show success message
-        st.success("🎉 Resume Processing Completed! Your resume has been successfully analyzed by AI.")
-        
-        # Display results
-        display_analysis_results(adapted_data)
-        
-        # Save results for download
-        result_file = save_results_to_file(adapted_data, uploaded_file.name)
-        
-        with open(result_file, 'rb') as f:
-            st.download_button(
-                label="📥 Download Analysis Results (JSON)",
-                data=f.read(),
-                file_name=f"resume_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
-            )
-
-        # Auto-store in Neo4j
-        if NEO4J_STORAGE_AVAILABLE:
-            with st.spinner("Storing in Neo4j database..."):
-                try_neo4j_storage(adapted_data)
-        else:
-            st.info("Neo4j storage not available - skipping database storage")
+        # AI Analysis
+        with st.spinner("🤖 Running AI analysis..."):
+            try:
+                from secrets_helper import GEMINI_API_KEY
+                analysis_result = extract_resume_with_gemini(extracted_text, GEMINI_API_KEY)
+                
+                if not analysis_result:
+                    st.error("❌ AI analysis failed - no result returned")
+                    return
+                
+                # Adapt for storage
+                adapted_data = adapt_gemini_output_for_neo4j(analysis_result)
+                
+                # Display results
+                display_analysis_results(adapted_data)
+                
+                # Save to file
+                result_file = save_results_to_file(adapted_data, uploaded_file.name)
+                st.info(f"💾 Results saved to: {result_file}")
+                
+                # Save the original resume file
+                resume_file = save_resume_file(uploaded_file)
+                st.info(f"📄 Resume saved to: {resume_file}")
+                
+                # Try to save to Neo4j if available and user is authenticated
+                if st.session_state.get('authenticated'):
+                    with st.spinner("💾 Saving to your profile..."):
+                        try_neo4j_storage(adapted_data, str(resume_file))
+                
+            except Exception as analysis_error:
+                st.error(f"❌ AI analysis failed: {analysis_error}")
+                return
         
     except Exception as e:
         st.error(f"❌ Processing failed: {e}")
@@ -203,37 +474,53 @@ def process_resume(uploaded_file):
     
     finally:
         # Clean up temp file
-        if 'temp_file_path' in locals():
+        if 'temp_file_path' in locals() and temp_file_path:
             try:
                 os.unlink(temp_file_path)
             except:
                 pass
 
-def try_neo4j_storage(adapted_data):
-    """Try to store in Neo4j if credentials are available"""
+def try_neo4j_storage(adapted_data, resume_file_path=None):
+    """Store analysis linked to authenticated user"""
     
     if not NEO4J_STORAGE_AVAILABLE:
-        st.warning("⚠️ Neo4j storage modules not available")
+        st.warning("Neo4j storage not available")
         return
     
     try:
-        # Get email for storage
-        personal_info = adapted_data.get('personal_info', {})
-        user_email = personal_info.get('email', f"user_{datetime.now().strftime('%Y%m%d_%H%M%S')}@example.com")
+        # Get the authenticated user's email
+        user_email = st.session_state.user_email
         
-        from connection import init_neo4j
+        from connection import init_neo4j, neo4j_connection
         init_neo4j()
         
-        # Use your full storage system
-        storage = ResumeNeo4jStorage()
-        user_id = storage.store_complete_resume(user_email, adapted_data)
-        
-        st.success(f"✅ Successfully stored complete resume in Neo4j!")
-        st.info(f"User ID: {user_id}")
-        st.info(f"Email: {user_email}")
+        with neo4j_connection.get_session() as session:
+            # Create analysis record linked to user
+            analysis_id = str(uuid.uuid4())
+            session.run("""
+                MATCH (u:User {email: $email})
+                CREATE (a:Analysis {
+                    id: $analysis_id,
+                    created_at: datetime(),
+                    data: $analysis_data,
+                    resume_name: $resume_name,
+                    resume_file_path: $resume_file_path
+                })
+                CREATE (u)-[:HAS_ANALYSIS]->(a)
+                RETURN a
+            """, {
+                'email': user_email,
+                'analysis_id': analysis_id,
+                'analysis_data': json.dumps(adapted_data),
+                'resume_name': adapted_data.get('personal_info', {}).get('name', 'Unknown'),
+                'resume_file_path': resume_file_path
+            })
+            
+        st.success(f"Analysis saved to your profile!")
+        st.info(f"Saved for: {user_email}")
         
     except Exception as e:
-        st.error(f"❌ Neo4j storage failed: {e}")
+        st.error(f"Save failed: {e}")
 
 def display_analysis_results(analysis_data):
     """Display the analysis results in a beautiful format"""
@@ -260,7 +547,7 @@ def display_analysis_results(analysis_data):
             university = personal.get('university', 'Not found')
             if len(university) > 15:
                 university = university[:12] + "..."
-        st.metric("🏫 University", university)
+            st.metric("🏫 University", university)
     
     # Technical skills
     tech_skills = analysis_data.get('technical_skills', [])
@@ -314,6 +601,70 @@ def display_analysis_results(analysis_data):
                 technologies = project.get('technologies', [])
                 if technologies:
                     st.write(f"**Technologies:** {', '.join(technologies)}")
+    
+    # Work Experience (includes internships and other experience)
+    experience = analysis_data.get('experience', [])
+    internships = analysis_data.get('internships', [])
+    
+    # Combine all experience types, avoiding duplicates
+    all_experience = []
+    if experience:
+        all_experience.extend(experience)
+    
+    if internships:
+        # Add internships that aren't already in experience array
+        for internship in internships:
+            # Check if this internship is already in experience by comparing key fields
+            is_duplicate = False
+            for exp in experience:
+                if (exp.get('company') == internship.get('company') and 
+                    exp.get('role') == internship.get('role') and
+                    exp.get('duration') == internship.get('duration')):
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                all_experience.append(internship)
+    
+    if all_experience:
+        st.subheader("💼 Work Experience")
+        
+        for i, exp in enumerate(all_experience):
+            # Determine title based on available fields
+            company = exp.get('company', f'Experience {i+1}')
+            role = exp.get('role', exp.get('position', 'Role not specified'))
+            exp_type = exp.get('type', 'internship' if 'internship' in str(exp).lower() else 'experience')
+            
+            # Create display title
+            if exp_type == 'internship':
+                title = f"🎓 {role} - {company} (Internship)"
+            else:
+                title = f"🏢 {role} - {company}"
+            
+            with st.expander(title):
+                st.write(f"**Duration:** {exp.get('duration', 'Not specified')}")
+                st.write(f"**Status:** {exp.get('status', 'Not specified').title()}")
+                
+                # Handle both 'responsibilities' and 'description' fields
+                description = exp.get('responsibilities', exp.get('description', 'No description'))
+                st.write(f"**Description:** {description}")
+                
+                # Technologies used
+                technologies = exp.get('technologies', [])
+                if technologies:
+                    st.write(f"**Technologies:** {', '.join(technologies)}")
+                
+                # Skills used (alternative field name)
+                skills_used = exp.get('skills_used', [])
+                if skills_used:
+                    st.write(f"**Skills Used:** {', '.join(skills_used)}")
+                
+                # Achievements if available
+                achievements = exp.get('achievements', [])
+                if achievements:
+                    st.write("**Key Achievements:**")
+                    for achievement in achievements:
+                        st.write(f"• {achievement}")
     
     # Experience level and summary
     exp_level = analysis_data.get('experience_level', {})
@@ -390,6 +741,25 @@ def settings_page():
     2. **Neo4j Aura**: Create free instance at [Neo4j Aura](https://console.neo4j.io/)
     3. **Environment Variables**: Add to `.streamlit/secrets.toml` for deployment
     """)
+
+def save_resume_file(uploaded_file):
+    """Save the uploaded resume file to local storage"""
+    
+    # Create resumes directory if it doesn't exist
+    resumes_dir = Path("resumes")
+    resumes_dir.mkdir(exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_extension = Path(uploaded_file.name).suffix
+    base_name = Path(uploaded_file.name).stem
+    resume_filename = resumes_dir / f"{base_name}_{timestamp}{file_extension}"
+    
+    # Save the file
+    with open(resume_filename, 'wb') as f:
+        f.write(uploaded_file.getvalue())
+    
+    return resume_filename
 
 def save_results_to_file(data, original_filename):
     """Save analysis results to a JSON file"""
