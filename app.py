@@ -299,8 +299,8 @@ def show_user_analyses():
                 RETURN a.id as id, a.created_at as created_at, 
                        a.data as data, a.resume_name as name,
                        a.resume_file_path as resume_file_path,
-                       a.resume_content_b64 as resume_content_b64,
-                       a.resume_filename as resume_filename
+                       coalesce(a.resume_content_b64, null) as resume_content_b64,
+                       coalesce(a.resume_filename, null) as resume_filename
                 ORDER BY a.created_at DESC
             """, {'email': user_email})
             
@@ -331,22 +331,33 @@ def show_user_analyses():
                             st.rerun()
                     
                     with col2:
-                        # Check if we have resume content in database or file path
-                        has_resume_content = resume_content_b64 is not None
-                        has_resume_file = resume_file_path and Path(resume_file_path).exists() if resume_file_path else False
+                        # Check what resume data we have
+                        resume_content_b64 = analysis.get('resume_content_b64')
+                        resume_filename = analysis.get('resume_filename') 
+                        resume_file_path = analysis.get('resume_file_path')
                         
-                        if has_resume_content or has_resume_file:
+                        # Determine if we can show resume
+                        has_database_content = resume_content_b64 is not None
+                        has_file_path = resume_file_path is not None
+                        file_exists = Path(resume_file_path).exists() if resume_file_path else False
+                        
+                        can_show_resume = has_database_content or file_exists
+                        
+                        if can_show_resume:
                             if st.button(f"📄 View Resume", key=f"resume_{analysis['id']}", use_container_width=True):
                                 # Set session state for resume viewing
                                 st.session_state[f"show_resume_{analysis['id']}"] = True
                                 st.session_state.current_resume_path = resume_file_path
                                 st.session_state.current_resume_content_b64 = resume_content_b64
-                                st.session_state.current_resume_filename = resume_filename
+                                st.session_state.current_resume_filename = resume_filename or (Path(resume_file_path).name if resume_file_path else None)
                                 st.rerun()
                         else:
-                            st.button(f"📄 Resume N/A", key=f"resume_na_{analysis['id']}", disabled=True, use_container_width=True)
-                            if resume_file_path:
-                                st.caption(f"Path: {resume_file_path}")
+                            # Show appropriate disabled button based on what's missing
+                            if has_file_path and not file_exists:
+                                st.button(f"📄 File Missing", key=f"resume_missing_{analysis['id']}", disabled=True, use_container_width=True)
+                                st.caption("File not found in deployment")
+                            else:
+                                st.button(f"📄 Resume N/A", key=f"resume_na_{analysis['id']}", disabled=True, use_container_width=True)
                     
                     with col3:
                         if st.button(f"🗑️ Delete", key=f"delete_{analysis['id']}", type="secondary", use_container_width=True):
@@ -388,17 +399,27 @@ def show_user_analyses():
                 if st.session_state.get(resume_key, False):
                     st.markdown("---")
                     
-                    # Check if we have content in database vs file path
+                    # Get resume data from session state
                     resume_content_b64 = st.session_state.get('current_resume_content_b64')
                     resume_filename = st.session_state.get('current_resume_filename') 
                     resume_path = st.session_state.get('current_resume_path')
                     
+                    # Try database content first (for new records), then file path (for old records)
                     if resume_content_b64 and resume_filename:
-                        # Display resume from database content
                         display_resume_from_database(resume_content_b64, resume_filename)
-                    elif resume_path:
-                        # Display resume from file path
+                    elif resume_path and Path(resume_path).exists():
                         display_original_resume(resume_path)
+                    elif resume_path:
+                        # File path exists but file is missing (common in deployment)
+                        st.header("📄 Original Resume")
+                        st.error("⚠️ Resume file not found in deployment environment")
+                        st.info(f"**Expected Path:** {resume_path}")
+                        st.info("💡 **Note:** This resume was uploaded before we added database storage. The file was stored locally but deployment environments don't persist files.")
+                        st.markdown("""
+                        **To access this resume:**
+                        1. Re-upload the same resume to get it stored in the database
+                        2. The new upload will have download capability in deployment
+                        """)
                     else:
                         st.error("No resume content available")
                     
