@@ -160,7 +160,7 @@ def process_resume(uploaded_file):
         # Step 3: Analyze with Gemini
         status_text.text("🧠 Step 3/3: Analyzing with Gemini AI...")
         
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = st.secrets.get('GEMINI_API_KEY') or os.getenv('GEMINI_API_KEY')
         if not api_key:
             st.error("❌ Gemini API key not found! Please set GEMINI_API_KEY in your environment.")
             return

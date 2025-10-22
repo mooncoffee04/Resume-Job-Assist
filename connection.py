@@ -10,10 +10,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    neo4j_uri = os.getenv('NEO4J_URI')
-    neo4j_user = os.getenv('NEO4J_USER') 
-    neo4j_password = os.getenv('NEO4J_PASSWORD')
-    neo4j_database = os.getenv('NEO4J_DATABASE', 'neo4j')
+    try:
+        import streamlit as st
+        neo4j_uri = st.secrets.get('NEO4J_URI') or os.getenv('NEO4J_URI')
+        neo4j_user = st.secrets.get('NEO4J_USER') or os.getenv('NEO4J_USER')
+        neo4j_password = st.secrets.get('NEO4J_PASSWORD') or os.getenv('NEO4J_PASSWORD')
+        neo4j_database = st.secrets.get('NEO4J_DATABASE') or os.getenv('NEO4J_DATABASE', 'neo4j')
+    except:
+        # Fallback for local development
+        neo4j_uri = os.getenv('NEO4J_URI')
+        neo4j_user = os.getenv('NEO4J_USER')
+        neo4j_password = os.getenv('NEO4J_PASSWORD')
+        neo4j_database = os.getenv('NEO4J_DATABASE', 'neo4j')
 
 settings = Settings()
 
