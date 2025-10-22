@@ -37,68 +37,28 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS with Dark Mode
+# Minimal CSS - let Streamlit handle dark mode
 st.markdown("""
 <style>
-    /* Dark mode styling */
-    .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
-    }
-    
     .main-header {
-        font-size: 2.5rem;  /* Reduced from 3rem */
+        font-size: 2.5rem;
         font-weight: bold;
-        color: #00d4ff;  /* Changed to cyan for dark mode */
         text-align: center;
         margin-bottom: 2rem;
     }
     
-    .success-box {
-        background-color: #1e3a2e;
-        border: 1px solid #4caf50;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin: 1rem 0;
-        color: #ffffff;
-    }
-    
-    .info-box {
-        background-color: #1a2332;
-        border: 1px solid #00d4ff;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        margin: 1rem 0;
-        color: #ffffff;
-    }
-    
-    /* Fix metric text overflow */
+    /* Fix metric text overflow only */
     .metric-container .metric-value {
         font-size: 1.2rem !important;
         word-wrap: break-word;
         max-width: 100%;
     }
     
-    /* Dark mode for dataframes */
-    .stDataFrame {
-        background-color: #262730;
-    }
-    
-    /* Dark mode for charts */
-    .stPlotlyChart {
-        background-color: transparent;
-    }
-    
-    /* Sidebar dark mode */
-    .css-1d391kg {
-        background-color: #1e1e1e;
-    }
-    
-    /* Text inputs dark mode */
-    .stTextInput input {
-        background-color: #262730;
-        color: #fafafa;
-        border: 1px solid #444;
+    /* Remove info/success box custom colors - let Streamlit handle it */
+    .success-box, .info-box {
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -108,12 +68,7 @@ def main():
     
     # Header
     st.markdown('<h1 class="main-header">🚀 Resume Intelligence AI</h1>', unsafe_allow_html=True)
-    st.markdown("""
-    <div class="info-box">
-        <strong>Transform your resume into actionable career insights!</strong><br>
-        Upload your resume → AI extracts skills & experience → Get comprehensive analysis
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("**Transform your resume into actionable career insights!**  \nUpload your resume → AI extracts skills & experience → Get comprehensive analysis")
     
     # Sidebar
     with st.sidebar:
@@ -218,12 +173,7 @@ def process_resume(uploaded_file):
         adapted_data = adapt_gemini_output_for_neo4j(analysis_results)
         
         # Show success message
-        st.markdown("""
-        <div class="success-box">
-            <h3>🎉 Resume Processing Completed!</h3>
-            <p>Your resume has been successfully analyzed by AI.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.success("🎉 Resume Processing Completed! Your resume has been successfully analyzed by AI.")
         
         # Display results
         display_analysis_results(adapted_data)
