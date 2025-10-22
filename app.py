@@ -896,11 +896,10 @@ def analytics_dashboard_page():
             
             # Get unique skills count (approximate from analysis data)
             skills_result = session.run("""
-                MATCH (a:Analysis)
-                WITH a.data as analysis_data
-                WHERE analysis_data IS NOT NULL
-                RETURN count(a) as analyses_with_skills
-            """)
+            MATCH (a:Analysis)
+            WHERE a.data IS NOT NULL
+            RETURN count(a) as analyses_with_skills
+        """)
             analyses_with_skills = skills_result.single()['analyses_with_skills']
             
             # Estimate unique skills (rough calculation)
