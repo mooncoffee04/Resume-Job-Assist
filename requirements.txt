@@ -7,3 +7,40 @@ python-dotenv
 google-generativeai
 neo4j
 pydantic-settings
+praw
+requests
+prawcore
+nltk
+spacy
+transformers
+python-dateutil
+python-dotenv
+# NLP Job Discovery System Requirements
+# Install these for the advanced NLP features
+
+# Core Reddit scraping
+praw
+requests
+
+# NLP and ML libraries
+sentence-transformers    # Semantic similarity
+transformers            # Zero-shot classification
+torch                   # PyTorch backend
+spacy                   # Named entity recognition
+nltk                    # Text preprocessing
+scikit-learn            # Cosine similarity, TF-IDF
+
+# Data processing
+numpy
+pandas
+python-dateutil
+
+# Environment management
+python-dotenv
+
+# Optional but recommended for better performance
+accelerate              # Faster transformer inference
+datasets                # Dataset utilities
+
+# For installing spacy model (run after pip install)
+# python -m spacy download en_core_web_sm

@@ -24,7 +24,8 @@ from connection import init_neo4j
 from text_extractor import DocumentTextExtractor
 from gemini_resume_parser import extract_resume_with_gemini
 from data_adapter import adapt_gemini_output_for_neo4j
-# Add these imports after line 12
+from job_search_components import job_search_page, show_job_details, saved_jobs_page
+
 try:
     from resume_storage import ResumeNeo4jStorage
     NEO4J_STORAGE_AVAILABLE = True
@@ -525,17 +526,24 @@ def main():
     # Navigation menu
     page = st.sidebar.selectbox(
         "📁 Choose a page:",
-        ["🏠 Upload & Analyze", "💾 My Saved Analyses", "📊 Analytics Dashboard", "⚙️ Settings"]
+        ["🏠 Upload & Analyze", "🔍 Job Search", "💾 My Saved Analyses", "💾 Saved Jobs", "📊 Analytics Dashboard", "⚙️ Settings"]
     )
     
     if page == "🏠 Upload & Analyze":
         upload_and_analyze_page()
+    elif page == "🔍 Job Search":
+        job_search_page()
+        # Show job details if a job is selected
+        show_job_details()
     elif page == "💾 My Saved Analyses":
         show_user_analyses()
     elif page == "📊 Analytics Dashboard":
         analytics_dashboard_page()
     elif page == "⚙️ Settings":
         settings_page()
+    elif page == "💾 Saved Jobs":
+        saved_jobs_page()
+        show_job_details() 
 
 def upload_and_analyze_page():
     """Main upload and analysis page"""
