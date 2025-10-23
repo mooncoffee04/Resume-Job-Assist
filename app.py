@@ -410,7 +410,7 @@ def show_user_analyses():
                 if st.session_state.get(analysis_key, False):
                     st.markdown("---")
                     try:
-                        saved_data = json.loads(st.session_state.current_analysis_data)
+                        saved_data = json.loads(st.session_state.get('current_analysis_data', '{}'))
                         display_analysis_results(saved_data)
                         
                         # Add a button to hide the analysis
