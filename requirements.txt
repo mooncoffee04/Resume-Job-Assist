@@ -44,3 +44,7 @@ datasets                # Dataset utilities
 
 # For installing spacy model (run after pip install)
 # python -m spacy download en_core_web_sm
+
+# Glassdoor scraper dependencies
+selenium
+webdriver-manager

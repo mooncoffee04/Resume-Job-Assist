@@ -96,3 +96,4 @@ node_modules/
 backend/data/
 backend/uploads/
 backend/*.db
+.streamlit/secrets.toml
