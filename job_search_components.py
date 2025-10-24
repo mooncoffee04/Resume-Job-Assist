@@ -247,7 +247,15 @@ def glassdoor_job_search_section():
             password = st.text_input("Password:", type="password")
             st.warning("⚠️ Credentials are used only for this session and not stored")
         
-        submitted = st.form_submit_button("🔍 Search Glassdoor Jobs", type="primary")
+        col_search, col_clear = st.columns(2)
+        with col_search:
+            submitted = st.form_submit_button("🔍 Search Glassdoor Jobs", type="primary")
+        with col_clear:
+            if st.form_submit_button("🔄 Clear & Reset"):
+                st.session_state.glassdoor_search_performed = False
+                st.session_state.glassdoor_jobs_fetched = False
+                st.session_state.glassdoor_jobs = []
+                st.rerun()
     
     # Perform search when form is submitted
     if submitted:
