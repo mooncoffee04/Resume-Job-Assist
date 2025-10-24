@@ -852,7 +852,7 @@ def display_analysis_results(analysis_data):
     if exp_level or summary:
         st.subheader("📈 Profile Summary")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         
         with col1:
             if exp_level:
@@ -863,14 +863,6 @@ def display_analysis_results(analysis_data):
             if summary:
                 strength = summary.get('profile_strength', 'Unknown').upper()
                 st.metric("💪 Strength", strength[:8])  # Truncate long text
-        
-        with col3:
-            if summary:
-                salary = summary.get('salary_range_estimate', 'Not estimated')
-                # Truncate salary if too long
-                if len(salary) > 15:
-                    salary = salary[:12] + "..."
-                st.metric("💰 Salary", salary)
 
 def analytics_dashboard_page():
     """Analytics dashboard showing processed resumes"""
