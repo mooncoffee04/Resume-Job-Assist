@@ -20,7 +20,7 @@ import uuid
 load_dotenv()
 
 # Local imports
-from connection import init_neo4j
+# from connection import init_neo4j
 from text_extractor import DocumentTextExtractor
 from gemini_resume_parser import extract_resume_with_gemini
 from data_adapter import adapt_gemini_output_for_neo4j
