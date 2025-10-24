@@ -105,7 +105,7 @@ def simple_auth():
         st.session_state.user_email = None
     
     if not st.session_state.authenticated:
-        st.title("🚀 Resume Context Job Finder")
+        st.title(" ☆ Resume Context Job Finder")
         st.subheader("Please login or create an account to continue")
         
         tab1, tab2 = st.tabs(["🔑 Login", "📝 Create Account"])
