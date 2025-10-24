@@ -474,7 +474,7 @@ def show_user_analyses():
 # Page config
 st.set_page_config(
     page_title="Resume Intelligence AI",
-    page_icon="🚀",
+    page_icon="📑",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -513,7 +513,7 @@ def main():
         return  # Show login/register forms
     
     # Sidebar navigation
-    st.sidebar.title("🚀 Resume AI")
+    st.sidebar.title("♥︎ Resume Assistant")
     st.sidebar.write(f"Welcome, {st.session_state.user_email}!")
     
     if st.sidebar.button("🚪 Logout"):
@@ -548,7 +548,7 @@ def main():
 def upload_and_analyze_page():
     """Main upload and analysis page"""
     
-    st.markdown('<h1 class="main-header">🚀 Resume Intelligence AI</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header"> 📑 Resume Assistant</h1>', unsafe_allow_html=True)
     st.markdown("Upload a resume and get instant AI-powered analysis")
     
     # File upload
