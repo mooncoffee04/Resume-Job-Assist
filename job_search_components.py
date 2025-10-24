@@ -398,16 +398,6 @@ def show_glassdoor_search_results():
         
         if glassdoor_jobs:
             st.success(f"🎉 Found {len(glassdoor_jobs)} jobs from Glassdoor!")
-        
-            # Add new reset button
-            col_success, col_reset = st.columns([3, 1])
-            with col_reset:
-                if st.button("🔄 Start New Search", key="new_glassdoor_search"):
-                    # Reset all Glassdoor session states
-                    for key in ['glassdoor_search_performed', 'glassdoor_jobs_fetched', 'glassdoor_jobs', 'glassdoor_search_params']:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.rerun()
             
             # Add filter controls
             with st.expander("🔧 Filter Results", expanded=False):
