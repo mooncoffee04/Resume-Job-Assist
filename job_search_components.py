@@ -761,7 +761,7 @@ def saved_jobs_page():
     
     # Sort jobs
     if sort_option == "Recently Saved":
-        sorted_jobs = sorted(unique_jobs, key=lambda x: x.get('saved_at', ''), reverse=True)
+        sorted_jobs = sorted(unique_jobs, key=lambda x: str(x.get('saved_at', '')), reverse=True)
     elif sort_option == "Job Confidence":
         sorted_jobs = sorted(unique_jobs, key=lambda x: x.get('job_confidence', 0), reverse=True)
     elif sort_option == "Source":
