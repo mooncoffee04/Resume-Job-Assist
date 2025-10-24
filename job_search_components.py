@@ -21,11 +21,344 @@ except ImportError:
     NLP_AVAILABLE = False
     st.error("⚠️ NLP job discovery system not available. Please install required packages.")
 
-def job_search_page():
-    """NLP-powered job search page"""
+def glassdoor_job_search_section():
+    """Glassdoor job search section"""
     
-    st.header("🧠 AI-Powered Job Search")
-    st.markdown("Advanced semantic job discovery using state-of-the-art NLP models!")
+    st.markdown("### 🏢 Search Glassdoor Jobs")
+    st.info("Direct job search from Glassdoor with real company postings")
+    
+    # Check if Glassdoor scraper is available
+    if not GLASSDOOR_AVAILABLE:
+        st.error("🚫 Glassdoor scraper is not properly configured.")
+        st.info("""
+        📋 **Required installations:**
+```bash
+        pip install selenium webdriver-manager
+        # Install ChromeDriver based on your system
+```
+        """)
+        return
+    
+    # Search form
+    with st.form("glassdoor_search_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            keywords = st.text_input(
+                "Job Keywords:",
+                placeholder="e.g., python developer, data scientist",
+                help="Enter job titles or keywords to search for"
+            )
+        
+        with col2:
+            location = st.text_input(
+                "Location:",
+                placeholder="e.g., Bangalore, Mumbai, Delhi",
+                help="Enter city name for job location"
+            )
+        
+        col3, col4, col5 = st.columns(3)
+        
+        with col3:
+            max_pages = st.selectbox(
+                "Pages to search:",
+                [1, 2, 3, 5],
+                index=0,
+                help="Number of result pages to scrape"
+            )
+        
+        with col4:
+            headless_mode = st.checkbox(
+                "Run in background",
+                value=True,
+                help="Run browser in headless mode (recommended)"
+            )
+        
+        with col5:
+            use_india_site = st.checkbox(
+                "Use India site",
+                value=True,
+                help="Use glassdoor.co.in instead of glassdoor.com"
+            )
+        
+        # Credentials section (optional)
+        with st.expander("🔐 Login Credentials (Optional)", expanded=False):
+            st.info("Login can help bypass some rate limits and access more job details")
+            email = st.text_input("Email:", type="default")
+            password = st.text_input("Password:", type="password")
+            st.warning("⚠️ Credentials are used only for this session and not stored")
+        
+        submitted = st.form_submit_button("🔍 Search Glassdoor Jobs", type="primary")
+    
+    # Perform search when form is submitted
+    if submitted:
+        if not keywords:
+            st.error("Please enter job keywords to search")
+            return
+        
+        if not location:
+            st.error("Please enter a location")
+            return
+        
+        # Store search parameters in session state
+        st.session_state.glassdoor_search_params = {
+            'keywords': keywords,
+            'location': location,
+            'max_pages': max_pages,
+            'headless_mode': headless_mode,
+            'use_india_site': use_india_site,
+            'email': email if email else None,
+            'password': password if password else None
+        }
+        st.session_state.glassdoor_search_performed = True
+        st.rerun()
+    
+    # Show search results if search was performed
+    if st.session_state.get('glassdoor_search_performed', False):
+        show_glassdoor_search_results()
+
+def show_glassdoor_search_results():
+    """Display Glassdoor search results"""
+    
+    st.markdown("---")
+    st.subheader("🏢 Glassdoor Search Results")
+    
+    search_params = st.session_state.get('glassdoor_search_params', {})
+    
+    # Show search query
+    with st.container():
+        st.info(f"🔍 **Searching:** {search_params.get('keywords', '')} in {search_params.get('location', '')}")
+    
+    # Perform search if not already done
+    if not st.session_state.get('glassdoor_jobs_fetched', False):
+        
+        progress_container = st.container()
+        with progress_container:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                status_text.text("🌐 Initializing Glassdoor scraper...")
+                progress_bar.progress(10)
+                
+                # Initialize scraper
+                scraper = GlassdoorSeleniumScraper(
+                    email=search_params.get('email'),
+                    password=search_params.get('password'),
+                    headless=search_params.get('headless_mode', True),
+                    use_india_site=search_params.get('use_india_site', True)
+                )
+                
+                progress_bar.progress(25)
+                status_text.text("🔐 Logging in (if credentials provided)...")
+                
+                # Login if credentials provided
+                if search_params.get('email') and search_params.get('password'):
+                    scraper.login()
+                
+                progress_bar.progress(40)
+                status_text.text("🔍 Searching for jobs...")
+                
+                # Search for jobs
+                jobs = scraper.search_jobs(
+                    keywords=search_params.get('keywords'),
+                    location=search_params.get('location'),
+                    max_pages=search_params.get('max_pages', 1)
+                )
+                
+                progress_bar.progress(90)
+                status_text.text("📊 Processing results...")
+                
+                # Convert JobListing objects to dictionaries for easier handling
+                jobs_data = []
+                for job in jobs:
+                    job_dict = {
+                        'title': job.title,
+                        'company': job.company,
+                        'location': job.location,
+                        'salary': job.salary,
+                        'description': job.description,
+                        'requirements': job.requirements,
+                        'job_type': job.job_type,
+                        'experience_level': job.experience_level,
+                        'technologies': job.technologies,
+                        'posted_date': job.posted_date,
+                        'application_url': job.application_url,
+                        'company_rating': job.company_rating,
+                        'remote_type': job.remote_type,
+                        'source': 'glassdoor'
+                    }
+                    jobs_data.append(job_dict)
+                
+                progress_bar.progress(100)
+                
+                # Close the scraper
+                scraper.close()
+                
+                # Store results
+                st.session_state.glassdoor_jobs = jobs_data
+                st.session_state.glassdoor_jobs_fetched = True
+                
+                # Clear progress indicators
+                progress_container.empty()
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Error during Glassdoor search: {str(e)}")
+                st.info("💡 Make sure ChromeDriver is installed and accessible")
+                if 'scraper' in locals():
+                    scraper.close()
+                return
+    
+    # Display results
+    if st.session_state.get('glassdoor_jobs_fetched', False):
+        glassdoor_jobs = st.session_state.get('glassdoor_jobs', [])
+        
+        if glassdoor_jobs:
+            st.success(f"🎉 Found {len(glassdoor_jobs)} jobs from Glassdoor!")
+            
+            # Add filter controls
+            with st.expander("🔧 Filter Results", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    experience_filter = st.selectbox(
+                        "Experience Level:",
+                        ["All"] + list(set([job.get('experience_level', 'Not specified') for job in glassdoor_jobs])),
+                        key="glassdoor_exp_filter"
+                    )
+                
+                with col2:
+                    remote_filter = st.selectbox(
+                        "Remote Type:",
+                        ["All"] + list(set([job.get('remote_type', 'Not specified') for job in glassdoor_jobs])),
+                        key="glassdoor_remote_filter"
+                    )
+                
+                with col3:
+                    job_type_filter = st.selectbox(
+                        "Job Type:",
+                        ["All"] + list(set([job.get('job_type', 'Not specified') for job in glassdoor_jobs])),
+                        key="glassdoor_type_filter"
+                    )
+            
+            # Apply filters
+            filtered_jobs = glassdoor_jobs
+            if experience_filter != "All":
+                filtered_jobs = [job for job in filtered_jobs if job.get('experience_level') == experience_filter]
+            if remote_filter != "All":
+                filtered_jobs = [job for job in filtered_jobs if job.get('remote_type') == remote_filter]
+            if job_type_filter != "All":
+                filtered_jobs = [job for job in filtered_jobs if job.get('job_type') == job_type_filter]
+            
+            st.info(f"Showing {len(filtered_jobs)} of {len(glassdoor_jobs)} jobs")
+            
+            # Display job cards
+            display_glassdoor_job_cards(filtered_jobs)
+            
+        else:
+            st.warning("No jobs found. Try different keywords or location.")
+
+def display_glassdoor_job_cards(jobs):
+    """Display Glassdoor jobs in card format"""
+    
+    for i, job in enumerate(jobs):
+        with st.container():
+            # Create a card-like container
+            with st.expander(f"🏢 {job.get('title', 'Job Title')} at {job.get('company', 'Company')}", expanded=False):
+                
+                # Job header with key info
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("📍 Location", job.get('location', 'Not specified'))
+                with col2:
+                    st.metric("⭐ Experience", job.get('experience_level', 'Not specified'))
+                with col3:
+                    st.metric("💼 Type", job.get('job_type', 'Not specified'))
+                with col4:
+                    if job.get('company_rating'):
+                        st.metric("⭐ Rating", f"{job.get('company_rating')}/5")
+                    else:
+                        st.metric("🏠 Remote", job.get('remote_type', 'Not specified'))
+                
+                # Salary information
+                if job.get('salary'):
+                    st.success(f"💰 **Salary:** {job.get('salary')}")
+                
+                # Technologies
+                if job.get('technologies'):
+                    tech_tags = " ".join([f"`{tech}`" for tech in job.get('technologies', [])[:8]])
+                    st.markdown(f"🛠️ **Technologies:** {tech_tags}")
+                
+                # Job description preview
+                description = job.get('description', '')
+                if description:
+                    if len(description) > 500:
+                        st.markdown(f"📄 **Description:** {description[:500]}...")
+                        with st.expander("Read full description"):
+                            st.write(description)
+                    else:
+                        st.markdown(f"📄 **Description:** {description}")
+                
+                # Requirements
+                if job.get('requirements'):
+                    st.markdown("📋 **Requirements:**")
+                    for req in job.get('requirements', [])[:5]:  # Show first 5 requirements
+                        st.markdown(f"• {req}")
+                    if len(job.get('requirements', [])) > 5:
+                        st.caption(f"... and {len(job.get('requirements', [])) - 5} more requirements")
+                
+                # Action buttons
+                col_btn1, col_btn2, col_btn3 = st.columns(3)
+                
+                with col_btn1:
+                    if st.button(f"📋 View Details", key=f"glassdoor_details_{i}", use_container_width=True):
+                        st.session_state.selected_job = job
+                        st.session_state.show_job_details = True
+                        st.rerun()
+                
+                with col_btn2:
+                    if job.get('application_url'):
+                        st.link_button(
+                            "🔗 Apply on Glassdoor",
+                            job.get('application_url'),
+                            use_container_width=True
+                        )
+                    else:
+                        st.button("🔗 No Link Available", disabled=True, use_container_width=True)
+                
+                with col_btn3:
+                    if st.button(f"💾 Save Job", key=f"glassdoor_save_{i}", use_container_width=True):
+                        save_job_to_session(job)
+                
+        st.divider()
+
+# Import the Glassdoor scraper
+try:
+    from glassdoor_job_scraper import GlassdoorSeleniumScraper, JobListing
+    GLASSDOOR_AVAILABLE = True
+except ImportError:
+    GLASSDOOR_AVAILABLE = False
+    st.error("⚠️ Glassdoor scraper not available. Please install selenium and chromedriver.")
+
+def job_search_page():
+    """Multi-source job search page with AI and Glassdoor"""
+    
+    st.header("🔍 Multi-Source Job Search")
+    st.markdown("Search jobs from multiple sources: AI-powered Reddit analysis + Glassdoor scraping!")
+    
+    # Add source selection tabs
+    tab1, tab2 = st.tabs(["🧠 AI-Powered (Reddit)", "🏢 Glassdoor Jobs"])
+    
+    with tab1:
+        nlp_job_search_section()
+    
+    with tab2:
+        glassdoor_job_search_section()
+
+def nlp_job_search_section():
+    """NLP-powered job search section (existing functionality)"""
     
     # Check if NLP system is available
     if not NLP_AVAILABLE:
@@ -649,6 +982,16 @@ def init_nlp_job_search_session():
     if 'show_job_details' not in st.session_state:
         st.session_state.show_job_details = False
 
+    # Add Glassdoor session state
+    if 'glassdoor_search_performed' not in st.session_state:
+        st.session_state.glassdoor_search_performed = False
+    if 'glassdoor_jobs_fetched' not in st.session_state:
+        st.session_state.glassdoor_jobs_fetched = False
+    if 'glassdoor_jobs' not in st.session_state:
+        st.session_state.glassdoor_jobs = []
+    if 'glassdoor_search_params' not in st.session_state:
+        st.session_state.glassdoor_search_params = {}
+
 def show_job_details():
     """Show detailed job analysis popup"""
     
@@ -671,10 +1014,29 @@ def show_job_details():
         
         # Job description
         st.markdown("### 📄 Description")
-        st.write(job.get('content', 'No description available'))
+        if job.get('source') == 'glassdoor':
+            st.write(job.get('description', 'No description available'))
+            
+            # Show requirements if available
+            if job.get('requirements'):
+                st.markdown("### 📋 Requirements")
+                for req in job.get('requirements', []):
+                    st.markdown(f"• {req}")
+            
+            # Show technologies if available
+            if job.get('technologies'):
+                st.markdown("### 🛠️ Technologies")
+                tech_cols = st.columns(min(len(job.get('technologies', [])), 4))
+                for i, tech in enumerate(job.get('technologies', [])):
+                    with tech_cols[i % 4]:
+                        st.badge(tech)
+        else:
+            st.write(job.get('content', 'No description available'))
         
         # Link to original post
-        if job.get('url'):
+        if job.get('source') == 'glassdoor' and job.get('application_url'):
+            st.markdown(f"[Apply on Glassdoor]({job['application_url']})")
+        elif job.get('url'):
             st.markdown(f"[View on Reddit]({job['url']})")
         
         # Action buttons based on current page
