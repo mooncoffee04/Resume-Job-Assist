@@ -278,8 +278,10 @@ def show_glassdoor_search_results():
                 if search_params.get('email') and search_params.get('password'):
                     scraper.login()
                 
-                progress_bar.progress(40)
-                status_text.text("🔍 Searching for jobs...")
+                # Update progress
+                progress = min(50 + (len(jobs_data) * 50 // max(1, len(jobs))), 100)
+                progress_bar.progress(progress)
+                status_text.text(f"Processing job {len(jobs_data)}/{len(jobs)}: {job.title[:50]}...")
                 
                 # Search for jobs
                 jobs = scraper.search_jobs(

@@ -336,6 +336,10 @@ class GlassdoorSeleniumScraper:
         """Search for jobs using Selenium automation with auto-redirect handling"""
         logger.info(f"🔍 Searching for: '{keywords}' in '{location}'")
         
+        all_jobs = []
+        max_pages = 3  # Limit to 3 pages to avoid long waits
+        current_page = 1
+        
         try:
             # Navigate to jobs page
             self.driver.get(self.jobs_url)
@@ -505,14 +509,25 @@ class GlassdoorSeleniumScraper:
                 
                 logger.info(f"✅ Found {len(page_jobs)} jobs on page {page}")
                 
-                # Try to go to next page
-                if page < max_pages:
-                    if not self._go_to_next_page():
-                        logger.info("📄 No more pages available")
-                        break
-                    time.sleep(3)
+                # Check if there are more pages and if we haven't hit our limit
+                if current_page >= max_pages:
+                    logger.info(f"🔄 Reached maximum page limit ({max_pages} pages)")
+                    break
+                    
+                if self._go_to_next_page():
+                    current_page += 1
+                    logger.info(f"📄 Moving to page {current_page}")
+                    time.sleep(3)  # Wait for page to load
+                else:
+                    logger.info("📄 No more pages available")
+                    break
             
             logger.info(f"🎉 Total jobs found: {len(all_jobs)}")
+
+            #Remove duplicates before returning
+            all_jobs = self._remove_duplicates(all_jobs)
+            logger.info(f"🔄 After duplicate removal: {len(all_jobs)} unique jobs")
+        
             return all_jobs
             
         except Exception as e:
@@ -531,8 +546,8 @@ class GlassdoorSeleniumScraper:
             initial_job_count = self._count_jobs_on_page()
             logger.info(f"🔍 Found {initial_job_count} job listings on this page")
             
-            # Process only 5 jobs for testing
-            jobs_to_process = min(initial_job_count, 5)
+            # Increase to 15 jobs
+            jobs_to_process = min(initial_job_count, 15)
             logger.info(f"🧪 Processing {jobs_to_process} jobs for testing")
             
             # Process jobs one by one
@@ -563,7 +578,7 @@ class GlassdoorSeleniumScraper:
                         logger.debug(f"⚠️ Skipped job {i+1} - insufficient data")
                     
                     # Small delay between job extractions
-                    time.sleep(2)
+                    time.sleep(1)
                     
                 except Exception as e:
                     logger.warning(f"⚠️ Error processing job {i+1}: {str(e)}")
@@ -1029,7 +1044,7 @@ class GlassdoorSeleniumScraper:
         try:
             # Wait longer for right panel content to load
             logger.debug("⏳ Waiting for detailed content to load...")
-            time.sleep(3)
+            time.sleep(2)
             
             # Extract company name from right panel (more reliable)
             company_selectors = [
@@ -1077,8 +1092,12 @@ class GlassdoorSeleniumScraper:
                 except:
                     continue
             
-            # Enhanced job description extraction with more selectors
+            # Enhanced job description extraction with "Show More" handling
             logger.debug("🔍 Looking for job description...")
+            
+            # First, try to click "Show More" button to expand description
+            self._click_show_more_button()
+            
             desc_selectors = [
                 # Primary selectors for job description
                 '.jobDescriptionContent',
@@ -1114,7 +1133,7 @@ class GlassdoorSeleniumScraper:
                         description = desc_elem.text.strip()
                         # Check for substantial description (more than just title/header)
                         if description and len(description) > 100:  # Require at least 100 characters
-                            info['description'] = description[:2000]  # Limit to 2000 chars
+                            info['description'] = description[:3000]  # Increased limit to 3000 chars
                             logger.debug(f"✅ Found description: {len(description)} characters")
                             description_found = True
                             break
@@ -1122,30 +1141,6 @@ class GlassdoorSeleniumScraper:
                         break
                 except:
                     continue
-            
-            if not description_found:
-                # Fallback: try to get any substantial text content
-                logger.debug("🔄 Trying fallback description extraction...")
-                try:
-                    # Look for the largest text block on the page
-                    all_divs = self.driver.find_elements(By.TAG_NAME, 'div')
-                    largest_text = ""
-                    for div in all_divs:
-                        try:
-                            text = div.text.strip()
-                            if len(text) > len(largest_text) and len(text) > 100:
-                                # Check if it's not navigation or header text
-                                if not any(word in text.lower() for word in ['navigation', 'menu', 'header', 'footer', 'copyright']):
-                                    largest_text = text
-                        except:
-                            continue
-                    
-                    if largest_text:
-                        info['description'] = largest_text[:2000]
-                        logger.debug(f"✅ Found fallback description: {len(largest_text)} characters")
-                
-                except Exception as e:
-                    logger.debug(f"Fallback description extraction failed: {str(e)}")
             
             # Extract requirements/qualifications
             requirements = []
@@ -1199,6 +1194,42 @@ class GlassdoorSeleniumScraper:
             logger.debug(f"Error extracting detailed info: {str(e)}")
         
         return info
+    
+    def _click_show_more_button(self):
+        """Try to click 'Show More' button to expand job description"""
+        show_more_selectors = [
+            'button:contains("Show more")',
+            'button:contains("Show More")',
+            '[data-test="show-more"]',
+            '.show-more-button',
+            'button[class*="show"][class*="more"]',
+            '.showMoreButton',
+            '.readMoreButton',
+            'a:contains("Show more")',
+            'span:contains("Show more")'
+        ]
+        
+        for selector in show_more_selectors:
+            try:
+                # Use JavaScript to find and click the button
+                self.driver.execute_script(f"""
+                    var buttons = document.querySelectorAll('button, a, span');
+                    for (var i = 0; i < buttons.length; i++) {{
+                        var text = buttons[i].textContent.toLowerCase().trim();
+                        if (text.includes('show more') || text.includes('read more') || text.includes('see more')) {{
+                            buttons[i].click();
+                            break;
+                        }}
+                    }}
+                """)
+                
+                logger.debug("🔍 Attempted to click Show More button")
+                time.sleep(1)  # Wait for content to expand
+                break
+                
+            except Exception as e:
+                logger.debug(f"Show More click attempt failed: {str(e)}")
+                continue
     
     def _merge_job_info(self, basic_info: Dict, detailed_info: Dict) -> JobListing:
         """Merge basic and detailed job information into a JobListing object"""
@@ -1262,6 +1293,23 @@ class GlassdoorSeleniumScraper:
         except Exception as e:
             logger.warning(f"⚠️ Could not navigate to next page: {str(e)}")
             return False
+    
+    def _remove_duplicates(self, jobs: List[JobListing]) -> List[JobListing]:
+        """Remove duplicate jobs based on title and company"""
+        seen = set()
+        unique_jobs = []
+        
+        for job in jobs:
+            # Create a key based on title and company (case-insensitive)
+            key = f"{job.title.lower().strip()}_{job.company.lower().strip()}"
+            
+            if key not in seen:
+                seen.add(key)
+                unique_jobs.append(job)
+            else:
+                logger.debug(f"🔄 Removed duplicate: {job.title} at {job.company}")
+        
+        return unique_jobs
     
     def _determine_job_type(self, text: str) -> str:
         """Determine job type from text content"""
