@@ -17,6 +17,43 @@ from datetime import datetime
 import sys
 import os
 
+# Custom CSS
+# Add custom CSS for better job details display
+def inject_job_details_css():
+    st.markdown("""
+    <style>
+    /* Reduce spacing between job detail elements */
+    .job-info-section {
+        margin-bottom: 1rem;
+    }
+    
+    /* Better formatting for job details */
+    .job-detail-metric {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Improve description readability */
+    .job-description {
+        line-height: 1.6;
+        text-align: justify;
+    }
+    
+    /* Technology badges styling */
+    .tech-badge {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 1rem;
+        font-size: 0.8rem;
+        margin: 0.2rem;
+        display: inline-block;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Import the NLP job discovery system
 try:
     from nlp_job_discovery import scrape_jobs_with_nlp, NLPJobDiscoverySystem
@@ -514,14 +551,15 @@ def show_job_details():
         st.markdown("---")
         st.subheader(f"📋 {job.get('title', 'Job Title')}")
         
-        # Basic info - handle both Reddit and Glassdoor jobs
-        col1, col2, col3 = st.columns(3)
+        # Basic info with smaller, more organized display
+        st.markdown("### 📊 Job Information")
+        
+        # First row - basic details
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            location = job.get('location', 'Not specified')
-            st.metric("Location", location)
+            st.markdown(f"**📍 Location**  \n{job.get('location', 'Not specified')}")
         with col2:
-            experience = job.get('experience_level', 'Not specified')
-            st.metric("Experience", experience)
+            st.markdown(f"**⭐ Experience**  \n{job.get('experience_level', 'Not specified')}")
         with col3:
             # Handle different remote field names
             remote_status = "No"
@@ -529,39 +567,78 @@ def show_job_details():
                 remote_status = "Yes"
             elif job.get('remote_type') and job.get('remote_type') != 'on-site':  # Glassdoor jobs
                 remote_status = job.get('remote_type', 'No')
-            st.metric("Remote", remote_status)
+            st.markdown(f"**🏠 Remote**  \n{remote_status}")
+        with col4:
+            st.markdown(f"**🔖 Source**  \n{job.get('source', 'unknown').title()}")
         
-        # Show additional metrics for Glassdoor jobs
+        # Second row - company details (for Glassdoor jobs)
         if job.get('source') == 'glassdoor':
-            col4, col5, col6 = st.columns(3)
-            with col4:
-                if job.get('company'):
-                    st.metric("Company", job.get('company'))
+            st.markdown("---")
+            col5, col6, col7, col8 = st.columns(4)
             with col5:
-                if job.get('salary'):
-                    st.metric("Salary", job.get('salary'))
+                if job.get('company'):
+                    st.markdown(f"**🏢 Company**  \n{job.get('company')}")
             with col6:
+                if job.get('salary'):
+                    st.markdown(f"**💰 Salary**  \n{job.get('salary')}")
+            with col7:
                 if job.get('company_rating'):
-                    st.metric("Rating", f"{job.get('company_rating')}/5")
+                    st.markdown(f"**⭐ Rating**  \n{job.get('company_rating')}/5")
+            with col8:
+                if job.get('job_type'):
+                    st.markdown(f"**⏰ Type**  \n{job.get('job_type', 'Full-time').title()}")
         
-        # Job description
-        st.markdown("### 📄 Description")
+        # Job description with better formatting
+        st.markdown("### 📄 Job Description")
         if job.get('source') == 'glassdoor':
-            st.write(job.get('description', 'No description available'))
+            description = job.get('description', 'No description available')
+            if description and description != 'No description available':
+                # Format the description for better readability
+                formatted_description = _format_job_description(description)
+                st.markdown(formatted_description)
+            else:
+                st.info("📝 No detailed description available")
             
             # Show requirements if available
             if job.get('requirements'):
                 st.markdown("### 📋 Requirements")
-                for req in job.get('requirements', []):
-                    st.markdown(f"• {req}")
+                requirements = job.get('requirements', [])
+                if len(requirements) > 5:
+                    # Show first 5 requirements with expand option
+                    for req in requirements[:5]:
+                        st.markdown(f"• {req}")
+                    
+                    with st.expander(f"View {len(requirements) - 5} more requirements"):
+                        for req in requirements[5:]:
+                            st.markdown(f"• {req}")
+                else:
+                    for req in requirements:
+                        st.markdown(f"• {req}")
             
             # Show technologies if available
             if job.get('technologies'):
-                st.markdown("### 🛠️ Technologies")
-                tech_cols = st.columns(min(len(job.get('technologies', [])), 4))
-                for i, tech in enumerate(job.get('technologies', [])):
-                    with tech_cols[i % 4]:
-                        st.badge(tech)
+                st.markdown("### 🛠️ Technologies & Skills")
+                technologies = job.get('technologies', [])
+                
+                # Display technologies in a more organized way
+                if len(technologies) <= 8:
+                    # Show all if 8 or fewer
+                    tech_cols = st.columns(min(len(technologies), 4))
+                    for i, tech in enumerate(technologies):
+                        with tech_cols[i % 4]:
+                            st.markdown(f"🔹 **{tech}**")
+                else:
+                    # Show first 8 with expand option
+                    tech_cols = st.columns(4)
+                    for i, tech in enumerate(technologies[:8]):
+                        with tech_cols[i % 4]:
+                            st.markdown(f"🔹 **{tech}**")
+                    
+                    with st.expander(f"View {len(technologies) - 8} more technologies"):
+                        extra_cols = st.columns(4)
+                        for i, tech in enumerate(technologies[8:]):
+                            with extra_cols[i % 4]:
+                                st.markdown(f"🔹 **{tech}**")
         else:
             # Reddit jobs
             st.write(job.get('content', 'No description available'))
@@ -590,6 +667,43 @@ def show_job_details():
             if st.button("❌ Close", key="close_saved_job_detail"):
                 st.session_state.show_job_details = False
                 st.rerun()
+
+def _format_job_description(description: str) -> str:
+    """Format job description for better readability"""
+    if not description:
+        return "No description available"
+    
+    # Split into paragraphs and clean up
+    paragraphs = description.split('\n')
+    formatted_paragraphs = []
+    
+    current_section = ""
+    
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+            
+        # Check if this looks like a section header
+        if (para.endswith(':') and len(para) < 50) or para.isupper():
+            if current_section:
+                formatted_paragraphs.append(current_section)
+            current_section = f"**{para}**"
+        else:
+            # Check if this looks like a bullet point
+            if para.startswith('•') or para.startswith('-') or para.startswith('*'):
+                para = f"• {para.lstrip('•-* ')}"
+            
+            if current_section:
+                current_section += f"\n{para}"
+            else:
+                current_section = para
+    
+    if current_section:
+        formatted_paragraphs.append(current_section)
+    
+    # Join paragraphs with proper spacing
+    return '\n\n'.join(formatted_paragraphs)
 
 def save_job_to_neo4j(job: Dict, user_email: str) -> bool:
     """Save a job to Neo4j database with enhanced handling for both Reddit and Glassdoor jobs"""
