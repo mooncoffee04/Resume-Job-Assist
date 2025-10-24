@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Enhanced Glassdoor Job Scraper with Selenium
-Uses browser automation to better emulate human behavior and bypass anti-bot measures
+Enhanced Glassdoor Job Scraper with Selenium (Improved Version)
+Features:
+- Faster scraping with reduced wait times
+- Full description extraction with "View More" button handling
+- Deployment-ready for Streamlit Cloud
+- Better error handling and robustness
 """
 
 from selenium import webdriver
@@ -19,6 +23,7 @@ from datetime import datetime
 import logging
 from dataclasses import dataclass
 import random
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +51,7 @@ class JobListing:
     source: str = "glassdoor"
 
 class GlassdoorSeleniumScraper:
-    """Enhanced Glassdoor scraper using Selenium WebDriver"""
+    """Enhanced Glassdoor scraper using Selenium WebDriver - Improved & Fast"""
     
     def __init__(self, email=None, password=None, headless=True, use_india_site=True):
         """Initialize the Selenium-based scraper"""
@@ -77,47 +82,84 @@ class GlassdoorSeleniumScraper:
         self.setup_driver(headless)
         
     def setup_driver(self, headless=True):
-        """Setup Chrome WebDriver with appropriate options"""
+        """Setup Chrome WebDriver with deployment-ready options (Fast & Optimized)"""
         try:
             chrome_options = Options()
             
-            if headless:
-                chrome_options.add_argument('--headless')
+            # Always run headless in deployment
+            chrome_options.add_argument('--headless')
             
-            # Add arguments to make Chrome less detectable as automation
+            # Essential arguments for deployment environments
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            chrome_options.add_experimental_option('useAutomationExtension', False)
-            chrome_options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-dev-tools')
+            chrome_options.add_argument('--no-zygote')
+            chrome_options.add_argument('--single-process')
+            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
             
-            # Initialize driver
-            self.driver = webdriver.Chrome(options=chrome_options)
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            # Speed optimizations
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-plugins')
+            chrome_options.add_argument('--disable-images')
+            chrome_options.add_argument('--disable-background-timer-throttling')
+            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+            chrome_options.add_argument('--disable-renderer-backgrounding')
+            chrome_options.add_argument('--disable-features=TranslateUI')
+            chrome_options.add_argument('--disable-ipc-flooding-protection')
             
-            # Set wait timeout
-            self.wait = WebDriverWait(self.driver, 10)
+            # Set binary location for deployment
+            if os.path.exists('/usr/bin/chromium'):
+                chrome_options.binary_location = '/usr/bin/chromium'
+            elif os.path.exists('/usr/bin/chromium-browser'):
+                chrome_options.binary_location = '/usr/bin/chromium-browser'
             
-            logger.info("🌐 Selenium WebDriver initialized successfully")
+            # User agent
+            chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            
+            # Try different methods to initialize driver
+            self.driver = None
+            
+            # Method 1: Use system chromedriver directly
+            try:
+                if os.path.exists('/usr/bin/chromedriver'):
+                    service = Service('/usr/bin/chromedriver')
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                else:
+                    self.driver = webdriver.Chrome(options=chrome_options)
+                logger.info("🌐 Using system ChromeDriver")
+            except Exception as e1:
+                logger.debug(f"System chromedriver failed: {e1}")
+                
+                # Method 2: Try webdriver-manager
+                try:
+                    from webdriver.manager.chrome import ChromeDriverManager
+                    service = Service(ChromeDriverManager().install())
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    logger.info("🌐 Using webdriver-manager")
+                except Exception as e2:
+                    raise Exception(f"All driver methods failed. Errors: {e1}, {e2}")
+            
+            if self.driver:
+                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                
+                # Set faster timeouts for speed
+                self.driver.implicitly_wait(5)
+                self.wait = WebDriverWait(self.driver, 10)
+                
+                logger.info("🌟 Selenium WebDriver initialized successfully")
+            else:
+                raise Exception("Failed to initialize WebDriver")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize WebDriver: {str(e)}")
-            logger.info("💡 Make sure you have ChromeDriver installed:")
-            logger.info("   brew install chromedriver  # On Mac")
-            logger.info("   Or download from: https://chromedriver.chromium.org/")
+            logger.error(f"❌ WebDriver initialization failed: {str(e)}")
             raise
-    
+
     def handle_verification_if_needed(self):
         """Handle any additional verification steps that might appear"""
         try:
-            # Check for common verification elements
             verification_indicators = [
-                'captcha',
-                'verify',
-                'security',
-                'robot',
-                'human'
+                'captcha', 'verify', 'security', 'robot', 'human'
             ]
             
             page_source = self.driver.page_source.lower()
@@ -126,10 +168,7 @@ class GlassdoorSeleniumScraper:
                 logger.warning("⚠️ Verification step detected!")
                 logger.info("🤖 Please complete any CAPTCHA or verification manually")
                 logger.info("⏳ Waiting 30 seconds for manual completion...")
-                
-                # Wait for user to complete verification
                 time.sleep(30)
-                
                 return True
             
             return False
@@ -150,21 +189,14 @@ class GlassdoorSeleniumScraper:
             # Navigate to login page
             login_url = f"{self.base_url}/profile/login_input.htm"
             self.driver.get(login_url)
+            time.sleep(2)  # Reduced wait time
             
-            # Wait for page to load
-            time.sleep(3)
-            
-            # STEP 1: Enter email and proceed to password page
+            # STEP 1: Enter email
             logger.info("📧 Step 1: Entering email...")
             
-            # Find and fill email field
             email_selectors = [
-                '#userEmail',
-                '[name="username"]',
-                '[type="email"]',
-                '#email',
-                'input[placeholder*="email"]',
-                '.EmailForm input'
+                '#userEmail', '[name="username"]', '[type="email"]', '#email',
+                'input[placeholder*="email"]', '.EmailForm input'
             ]
             
             email_element = None
@@ -179,22 +211,15 @@ class GlassdoorSeleniumScraper:
                 logger.error("❌ Could not find email input field")
                 return False
             
-            # Clear and enter email
             email_element.clear()
-            time.sleep(1)
+            time.sleep(0.5)  # Reduced wait
             email_element.send_keys(self.email)
             logger.info("✅ Email entered")
             
-            # Find and click continue/next button for email step
+            # Find and click continue button
             email_continue_selectors = [
-                '#emailButton',
-                'button[name="submit"]',
-                '[type="submit"]',
-                'button:contains("Continue")',
-                'button:contains("Next")',
-                '.EmailForm button',
-                '#continueBtn',
-                'button[data-test="email-form-button"]'
+                '#emailButton', 'button[name="submit"]', '[type="submit"]',
+                'button:contains("Continue")', 'button:contains("Next")', '.EmailForm button'
             ]
             
             email_continue_button = None
@@ -203,33 +228,23 @@ class GlassdoorSeleniumScraper:
                     email_continue_button = self.driver.find_element(By.CSS_SELECTOR, selector)
                     if email_continue_button.is_enabled():
                         break
-                except NoSuchElementException:
+                except:
                     continue
             
-            if email_continue_button:
-                email_continue_button.click()
-                logger.info("✅ Email continue button clicked")
-            else:
-                # Try pressing Enter on email field
-                from selenium.webdriver.common.keys import Keys
-                email_element.send_keys(Keys.RETURN)
-                logger.info("✅ Email submitted with Enter key")
+            if not email_continue_button:
+                logger.error("❌ Could not find email continue button")
+                return False
             
-            # Wait for redirect to password page
-            logger.info("⏳ Waiting for password page...")
-            time.sleep(4)
+            email_continue_button.click()
+            logger.info("✅ Clicked email continue button")
+            time.sleep(2)  # Reduced wait
             
-            # STEP 2: Enter password on the second page
+            # STEP 2: Enter password
             logger.info("🔑 Step 2: Entering password...")
             
-            # Wait for password field to appear (it might take a moment)
             password_selectors = [
-                '#userPassword',
-                '[name="password"]',
-                '[type="password"]',
-                '#password',
-                'input[placeholder*="password"]',
-                '.PasswordForm input'
+                '#userPassword', '[name="password"]', '[type="password"]', '#password',
+                'input[placeholder*="password"]', '.PasswordForm input[type="password"]'
             ]
             
             password_element = None
@@ -241,234 +256,135 @@ class GlassdoorSeleniumScraper:
                     continue
             
             if not password_element:
-                logger.error("❌ Could not find password input field on second page")
-                # Try to take a screenshot for debugging
-                try:
-                    self.driver.save_screenshot("glassdoor_password_page_debug.png")
-                    logger.info("📸 Saved debug screenshot: glassdoor_password_page_debug.png")
-                except:
-                    pass
+                logger.error("❌ Could not find password input field")
                 return False
             
-            # Clear and enter password
             password_element.clear()
-            time.sleep(1)
+            time.sleep(0.5)
             password_element.send_keys(self.password)
             logger.info("✅ Password entered")
             
-            # Find and click login button on password page
-            password_login_selectors = [
-                '#signInBtn',
-                '#passwordButton',
-                'button[name="submit"]',
-                '[type="submit"]',
-                'button:contains("Sign In")',
-                'button:contains("Login")',
-                '.PasswordForm button',
-                'button[data-test="password-form-button"]'
+            # Find and click login button
+            login_button_selectors = [
+                '#passwordButton', 'button[name="submit"]', '[type="submit"]',
+                'button:contains("Sign In")', 'button:contains("Login")', '.PasswordForm button'
             ]
             
             login_button = None
-            for selector in password_login_selectors:
+            for selector in login_button_selectors:
                 try:
                     login_button = self.driver.find_element(By.CSS_SELECTOR, selector)
                     if login_button.is_enabled():
                         break
-                except NoSuchElementException:
+                except:
                     continue
             
-            if login_button:
-                login_button.click()
-                logger.info("✅ Password login button clicked")
-            else:
-                # Try pressing Enter on password field
-                from selenium.webdriver.common.keys import Keys
-                password_element.send_keys(Keys.RETURN)
-                logger.info("✅ Password submitted with Enter key")
+            if not login_button:
+                logger.error("❌ Could not find login button")
+                return False
             
-            # Check for any verification steps before proceeding
+            login_button.click()
+            logger.info("✅ Clicked login button")
+            time.sleep(3)  # Reduced wait
+            
+            # Check for verification
             self.handle_verification_if_needed()
-            
-            # Wait for login to complete
-            logger.info("⏳ Waiting for login to complete...")
-            time.sleep(6)
             
             # Check if login was successful
             current_url = self.driver.current_url
-            page_source = self.driver.page_source.lower()
-            
-            # Multiple ways to check successful login
-            login_success_indicators = [
-                'dashboard' in current_url.lower(),
-                'profile' in current_url.lower(),
-                'account' in current_url.lower(),
-                'login' not in current_url.lower(),
-                'welcome' in page_source,
-                'sign out' in page_source,
-                'logout' in page_source
-            ]
-            
-            if any(login_success_indicators):
-                logger.info("✅ Successfully logged in to Glassdoor")
+            if 'login' not in current_url.lower():
+                logger.info("🎉 Login successful!")
                 return True
             else:
-                logger.warning("⚠️ Login may have failed")
-                logger.info(f"Current URL: {current_url}")
-                # Save screenshot for debugging
-                try:
-                    self.driver.save_screenshot("glassdoor_login_result_debug.png")
-                    logger.info("📸 Saved debug screenshot: glassdoor_login_result_debug.png")
-                except:
-                    pass
+                logger.warning("⚠️ Login may have failed - still on login page")
                 return False
                 
         except Exception as e:
             logger.error(f"❌ Login failed: {str(e)}")
-            # Save screenshot for debugging
-            try:
-                self.driver.save_screenshot("glassdoor_login_error_debug.png")
-                logger.info("📸 Saved error screenshot: glassdoor_login_error_debug.png")
-            except:
-                pass
             return False
-    
-    def search_jobs(self, keywords: str, location: str = "India", max_pages: int = 3) -> List[JobListing]:
-        """Search for jobs using Selenium automation with auto-redirect handling"""
+
+    def search_jobs(self, keywords: str, location: str = "", max_pages: int = 1) -> List[JobListing]:
+        """Search for jobs on Glassdoor (Fast & Optimized)"""
+        
         logger.info(f"🔍 Searching for: '{keywords}' in '{location}'")
         
         try:
-            # Navigate to jobs page
+            # Navigate to jobs page first
             self.driver.get(self.jobs_url)
-            time.sleep(3)
+            time.sleep(1.5)  # Reduced wait time
             
-            # Find and fill job search field
-            job_input_selectors = [
-                '#searchBar-jobTitle',
-                '[placeholder*="job"]',
-                '[id*="job"]',
-                '.job-search input'
-            ]
+            # Try to search using the search form
+            search_success = False
             
-            job_input = None
-            for selector in job_input_selectors:
-                try:
-                    job_input = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                    break
-                except TimeoutException:
-                    continue
-            
-            if not job_input:
-                logger.error("❌ Could not find job search input")
-                return []
-            
-            job_input.clear()
-            job_input.send_keys(keywords)
-            logger.info(f"✅ Job keywords entered: {keywords}")
-            
-            # Small delay to let the field register
-            time.sleep(1)
-            
-            # Find and fill location field
-            location_input_selectors = [
-                '#searchBar-location',
-                '[placeholder*="location"]',
-                '[placeholder*="city"]',
-                '[id*="location"]'
-            ]
-            
-            location_input = None
-            for selector in location_input_selectors:
-                try:
-                    location_input = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    break
-                except NoSuchElementException:
-                    continue
-            
-            if location_input:
-                location_input.clear()
-                time.sleep(1)
-                location_input.send_keys(location)
-                logger.info(f"✅ Location entered: {location}")
+            try:
+                # Find search inputs
+                keyword_input = None
+                location_input = None
                 
-                # Wait for autocomplete dropdown to appear
-                time.sleep(2)
+                keyword_selectors = [
+                    'input[placeholder*="job title"]', 'input[placeholder*="Job title"]',
+                    'input[id*="keyword"]', 'input[name*="keyword"]',
+                    '#searchBar-jobTitle', '.jobsearch input:first-child'
+                ]
                 
-                # Try to click on the autocomplete suggestion
-                try:
-                    autocomplete_selectors = [
-                        f'[data-test*="location-suggestion"]:contains("{location}")',
-                        f'.autocomplete-suggestion:contains("{location}")',
-                        f'[role="option"]:contains("{location}")',
-                        '.autocomplete ul li',
-                        '[data-test="location-suggestion"]'
+                for selector in keyword_selectors:
+                    try:
+                        keyword_input = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        break
+                    except:
+                        continue
+                
+                location_selectors = [
+                    'input[placeholder*="location"]', 'input[placeholder*="Location"]',
+                    'input[id*="location"]', 'input[name*="location"]',
+                    '#searchBar-location', '.jobsearch input:last-child'
+                ]
+                
+                for selector in location_selectors:
+                    try:
+                        location_input = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        break
+                    except:
+                        continue
+                
+                if keyword_input and location_input:
+                    keyword_input.clear()
+                    time.sleep(0.5)
+                    keyword_input.send_keys(keywords)
+                    
+                    location_input.clear()
+                    time.sleep(0.5)
+                    location_input.send_keys(location)
+                    
+                    # Find and click search button
+                    search_button_selectors = [
+                        'button[type="submit"]', 'button[data-test*="search"]',
+                        '.searchButton', 'input[type="submit"]'
                     ]
                     
-                    for selector in autocomplete_selectors:
+                    for selector in search_button_selectors:
                         try:
-                            # Wait for suggestions to load
-                            suggestions = self.driver.find_elements(By.CSS_SELECTOR, selector.split(':contains')[0])
-                            
-                            if suggestions:
-                                # Look for suggestion containing our location
-                                for suggestion in suggestions:
-                                    if location.lower() in suggestion.text.lower():
-                                        logger.info(f"🎯 Clicking autocomplete suggestion: {suggestion.text}")
-                                        suggestion.click()
-                                        
-                                        # Wait for auto-redirect
-                                        logger.info("⏳ Waiting for auto-redirect...")
-                                        time.sleep(4)
-                                        
-                                        # Check if we've been redirected to search results
-                                        current_url = self.driver.current_url
-                                        if 'SRCH_' in current_url or 'jobs' in current_url:
-                                            logger.info("✅ Auto-redirected to search results!")
-                                            break
-                                        
-                                break
-                            
-                        except Exception as e:
-                            logger.debug(f"Autocomplete attempt failed: {str(e)}")
+                            search_button = self.driver.find_element(By.CSS_SELECTOR, selector)
+                            search_button.click()
+                            search_success = True
+                            break
+                        except:
                             continue
                     
-                except Exception as e:
-                    logger.warning(f"⚠️ Autocomplete selection failed: {str(e)}")
+                    if search_success:
+                        logger.info("✅ Used search form successfully")
+                        time.sleep(1.5)  # Reduced wait
+                    
+            except Exception as e:
+                logger.debug(f"Search form method failed: {str(e)}")
             
-            # If we're not on results page yet, try alternative approaches
-            current_url = self.driver.current_url
-            if 'SRCH_' not in current_url and 'jobs' not in current_url:
-                logger.info("🔄 Trying alternative search approaches...")
-                
-                # Method 1: Press Enter on location field
+            # Method 2: Direct URL construction if form search failed
+            if not search_success:
                 try:
-                    if location_input:
-                        from selenium.webdriver.common.keys import Keys
-                        location_input.send_keys(Keys.RETURN)
-                        logger.info("✅ Pressed Enter on location field")
-                        time.sleep(3)
-                except Exception as e:
-                    logger.debug(f"Enter key method failed: {str(e)}")
-                
-                # Method 2: Try to click search button with JavaScript
-                current_url = self.driver.current_url
-                if 'SRCH_' not in current_url:
-                    try:
-                        search_button = self.driver.find_element(By.CSS_SELECTOR, '.SearchBar button, [type="submit"]')
-                        # Use JavaScript click to avoid interception
-                        self.driver.execute_script("arguments[0].click();", search_button)
-                        logger.info("✅ Search button clicked with JavaScript")
-                        time.sleep(3)
-                    except Exception as e:
-                        logger.debug(f"JavaScript click method failed: {str(e)}")
-                
-                # Method 3: Direct URL construction if we know the pattern
-                current_url = self.driver.current_url
-                if 'SRCH_' not in current_url:
-                    try:
-                        # Construct direct search URL (Glassdoor pattern)
-                        keywords_encoded = keywords.replace(' ', '-')
-                        location_encoded = location.lower().replace(' ', '-').replace(',', '')
-                        
+                    logger.info("🌐 Trying direct URL construction...")
+                    keywords_encoded = keywords.replace(' ', '-').lower()
+                    
+                    if self.use_india_site:
                         if 'mumbai' in location.lower():
                             direct_url = f"{self.base_url}/Job/mumbai-india-{keywords_encoded}-jobs-SRCH_IL.0,12_IC2851180_KO13,{13+len(keywords)}.htm"
                         elif 'bangalore' in location.lower():
@@ -476,15 +392,14 @@ class GlassdoorSeleniumScraper:
                         elif 'delhi' in location.lower():
                             direct_url = f"{self.base_url}/Job/delhi-india-{keywords_encoded}-jobs-SRCH_IL.0,11_IC2861069_KO12,{12+len(keywords)}.htm"
                         else:
-                            # Generic India search
                             direct_url = f"{self.base_url}/Job/india-{keywords_encoded}-jobs-SRCH_IL.0,5_IN115_KO6,{6+len(keywords)}.htm"
                         
                         logger.info(f"🌐 Navigating directly to: {direct_url}")
                         self.driver.get(direct_url)
-                        time.sleep(3)
+                        time.sleep(1.5)  # Reduced wait
                         
-                    except Exception as e:
-                        logger.warning(f"⚠️ Direct URL construction failed: {str(e)}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Direct URL construction failed: {str(e)}")
             
             # Verify we're on search results page
             current_url = self.driver.current_url
@@ -492,7 +407,7 @@ class GlassdoorSeleniumScraper:
                 logger.error("❌ Failed to reach search results page")
                 return []
             
-            logger.info(f"📍 Successfully reached search results: {current_url}")
+            logger.info(f"🔍 Successfully reached search results: {current_url}")
             
             # Extract jobs from search results
             all_jobs = []
@@ -510,742 +425,284 @@ class GlassdoorSeleniumScraper:
                     if not self._go_to_next_page():
                         logger.info("📄 No more pages available")
                         break
-                    time.sleep(3)
+                    time.sleep(1.5)  # Reduced wait
             
             logger.info(f"🎉 Total jobs found: {len(all_jobs)}")
             return all_jobs
             
         except Exception as e:
-            logger.error(f"❌ Search failed: {str(e)}")
+            logger.error(f"❌ Error during job search: {str(e)}")
             return []
-    
+
     def _extract_jobs_from_current_page(self) -> List[JobListing]:
-        """Extract job listings from the current page with detailed information"""
+        """Extract job listings from current page (Fast & Optimized)"""
+        
         jobs = []
         
         try:
-            # Wait for job listings to load
-            time.sleep(2)
+            # Common selectors for job listings
+            job_selectors = [
+                '[data-test="job-listing"]', '.react-job-listing', '.jobContainer',
+                '.job', '.JobsList_jobListItem', '[class*="job"]'
+            ]
             
-            # Get initial count of jobs on the page
-            initial_job_count = self._count_jobs_on_page()
-            logger.info(f"🔍 Found {initial_job_count} job listings on this page")
-            
-            # Process only 5 jobs for testing
-            jobs_to_process = min(initial_job_count, 5)
-            logger.info(f"🧪 Processing {jobs_to_process} jobs for testing")
-            
-            # Process jobs one by one
-            for i in range(jobs_to_process):
+            job_elements = []
+            for selector in job_selectors:
                 try:
-                    logger.info(f"📋 Processing job {i+1}/{jobs_to_process}")
-                    
-                    # Re-find job containers each time (in case page refreshed)
-                    job_containers = self._find_job_containers()
-                    
-                    if not job_containers or i >= len(job_containers):
-                        logger.warning(f"⚠️ Job {i+1} not found, page may have changed")
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        job_elements = elements
+                        logger.debug(f"✅ Found job elements using selector: {selector}")
                         break
-                    
-                    container = job_containers[i]
-                    
-                    # Extract job with details
-                    job_info = self._extract_job_with_details(container, i)
-                    
-                    if job_info and job_info.title and job_info.title != "Not specified":
-                        jobs.append(job_info)
-                        logger.info(f"✅ Extracted: {job_info.title} at {job_info.company}")
-                        if job_info.description:
-                            logger.info(f"📝 Description length: {len(job_info.description)} characters")
-                        else:
-                            logger.warning("⚠️ No description extracted")
-                    else:
-                        logger.debug(f"⚠️ Skipped job {i+1} - insufficient data")
-                    
-                    # Small delay between job extractions
-                    time.sleep(2)
-                    
+                except:
+                    continue
+            
+            if not job_elements:
+                logger.warning("⚠️ No job elements found on page")
+                return jobs
+            
+            logger.info(f"📋 Found {len(job_elements)} job listings on page")
+            
+            for i, job_element in enumerate(job_elements[:15]):  # Limit for speed
+                try:
+                    job = self._extract_job_details_fast(job_element, i)
+                    if job:
+                        jobs.append(job)
                 except Exception as e:
-                    logger.warning(f"⚠️ Error processing job {i+1}: {str(e)}")
+                    logger.debug(f"⚠️ Failed to extract job {i}: {str(e)}")
                     continue
             
         except Exception as e:
             logger.error(f"❌ Error extracting jobs from page: {str(e)}")
         
         return jobs
-    
-    def _count_jobs_on_page(self) -> int:
-        """Count the number of job listings on the current page"""
-        try:
-            job_containers = self._find_job_containers()
-            return len(job_containers)
-        except:
-            return 0
-    
-    def _find_job_containers(self) -> list:
-        """Find job containers on the current page"""
-        job_selectors = [
-            '[data-test="jobListing"]',
-            '.JobsList_jobListItem__wjTHv',
-            '.react-job-listing',
-            '.job-result',
-            '[class*="JobResult"]',
-            '.jobResult'
-        ]
-        
-        job_containers = []
-        for selector in job_selectors:
-            try:
-                job_containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                if job_containers:
-                    logger.debug(f"✅ Found {len(job_containers)} jobs using selector: {selector}")
-                    break
-            except Exception:
-                continue
-        
-        if not job_containers:
-            # Fallback: try to find any clickable job elements
-            try:
-                job_containers = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="/job-listing/"]')
-                if job_containers:
-                    logger.debug(f"✅ Found {len(job_containers)} jobs using href fallback")
-            except Exception:
-                pass
-        
-        return job_containers
-    
-    def _extract_job_with_details(self, container, index: int) -> Optional[JobListing]:
-        """Extract job details by clicking on the job and reading the right panel"""
-        try:
-            # First, try to extract basic info from the left panel
-            basic_info = self._extract_basic_job_info(container)
-            
-            # Store current URL to return to search results
-            search_results_url = self.driver.current_url
-            
-            # Try to click on the job to get detailed info
-            detailed_info = {}
-            navigation_succeeded = False
-            
-            try:
-                # Find clickable element (could be the container itself or a link inside)
-                clickable_element = None
-                
-                # Try different clickable elements
-                click_selectors = [
-                    'a[data-test="job-title"]',
-                    'a[href*="/job-listing/"]',
-                    '.jobTitle a',
-                    'h3 a',
-                    'a'
-                ]
-                
-                for selector in click_selectors:
-                    try:
-                        clickable_element = container.find_element(By.CSS_SELECTOR, selector)
-                        break
-                    except:
-                        continue
-                
-                if not clickable_element:
-                    # Try clicking the container itself
-                    clickable_element = container
-                
-                # Scroll element into view
-                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", clickable_element)
-                time.sleep(0.5)
-                
-                # Click the job
-                try:
-                    clickable_element.click()
-                    logger.debug(f"✅ Clicked on job {index+1}")
-                    navigation_succeeded = True
-                except Exception:
-                    # If direct click fails, use JavaScript
-                    self.driver.execute_script("arguments[0].click();", clickable_element)
-                    logger.debug(f"✅ JavaScript clicked on job {index+1}")
-                    navigation_succeeded = True
-                
-                if navigation_succeeded:
-                    # Wait for page change or right panel to load
-                    time.sleep(3)
-                    
-                    # Check if we navigated to a new page or if details loaded in right panel
-                    current_url = self.driver.current_url
-                    
-                    if current_url != search_results_url:
-                        # We navigated to a dedicated job page
-                        logger.debug(f"📄 Navigated to dedicated job page for job {index+1}")
-                        
-                        # Extract detailed info from dedicated page
-                        detailed_info = self._extract_detailed_job_info_from_page()
-                        
-                        # Navigate back to search results
-                        logger.debug(f"🔙 Returning to search results...")
-                        self._return_to_search_results(search_results_url)
-                        
-                    else:
-                        # Details loaded in right panel (same page)
-                        logger.debug(f"📋 Details loaded in right panel for job {index+1}")
-                        detailed_info = self._extract_detailed_job_info()
-                
-            except Exception as e:
-                logger.debug(f"Could not click job {index+1}: {str(e)}")
-                # Ensure we're still on the search results page
-                if self.driver.current_url != search_results_url:
-                    self._return_to_search_results(search_results_url)
-            
-            # Merge basic and detailed info
-            return self._merge_job_info(basic_info, detailed_info)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Error extracting job {index+1}: {str(e)}")
-            return None
-    
-    def _return_to_search_results(self, search_results_url: str):
-        """Return to search results page with multiple fallback methods"""
-        try:
-            # Method 1: Use browser back button
-            self.driver.back()
-            time.sleep(2)
-            
-            # Check if we're back on search results
-            current_url = self.driver.current_url
-            if 'SRCH_' in current_url or 'Job/' in current_url:
-                logger.debug("✅ Successfully returned via back button")
-                return
-            
-            # Method 2: Navigate directly to stored URL
-            logger.debug(f"🔄 Back button failed, navigating directly to: {search_results_url}")
-            self.driver.get(search_results_url)
-            time.sleep(3)
-            
-            # Verify we're back
-            current_url = self.driver.current_url
-            if 'SRCH_' in current_url or 'Job/' in current_url:
-                logger.debug("✅ Successfully returned via direct navigation")
-                return
-            
-            # Method 3: If all else fails, log the issue
-            logger.warning("⚠️ Failed to return to search results page")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Error returning to search results: {str(e)}")
-            try:
-                # Last resort: navigate to the stored URL
-                self.driver.get(search_results_url)
-                time.sleep(3)
-            except:
-                pass
-    
-    def _extract_basic_job_info(self, container) -> Dict:
-        """Extract basic job information from left panel container"""
-        info = {}
+
+    def _extract_job_details_fast(self, job_element, index: int) -> Optional[JobListing]:
+        """Extract details from a single job element (Fast & Enhanced)"""
         
         try:
             # Extract title
+            title = "Job Title"
             title_selectors = [
-                '[data-test="job-title"]', 
-                'a[class*="jobTitle"]', 
-                'h3 a', 
-                '.jobTitle a',
-                'a[href*="/job-listing/"]'
+                '[data-test="job-title"]', '.jobTitle', 'h2', 'h3',
+                '[class*="title"]', 'a[data-test*="job-title"]'
             ]
             
             for selector in title_selectors:
                 try:
-                    title_elem = container.find_element(By.CSS_SELECTOR, selector)
-                    info['title'] = title_elem.text.strip()
-                    info['application_url'] = title_elem.get_attribute('href') or ""
-                    if info['title']:
+                    title_elem = job_element.find_element(By.CSS_SELECTOR, selector)
+                    title = title_elem.text.strip()
+                    if title:
                         break
                 except:
                     continue
             
-            # Extract company from left panel
+            # Extract company
+            company = "Company"
             company_selectors = [
-                '[data-test="employer-name"]',
-                '.employer', 
-                '[class*="company"]',
-                '.companyName'
+                '[data-test="employer-name"]', '.companyName', '.employerName',
+                '[class*="company"]', 'span[title]'
             ]
             
             for selector in company_selectors:
                 try:
-                    company_elem = container.find_element(By.CSS_SELECTOR, selector)
-                    info['company'] = company_elem.text.strip()
-                    if info['company']:
+                    company_elem = job_element.find_element(By.CSS_SELECTOR, selector)
+                    company = company_elem.text.strip()
+                    if company:
                         break
                 except:
                     continue
             
-            # Extract location from left panel
+            # Extract location
+            location = "Location"
             location_selectors = [
-                '[data-test="job-location"]',
-                '.location', 
+                '[data-test="job-location"]', '.location', '.jobLocation',
                 '[class*="location"]'
             ]
             
             for selector in location_selectors:
                 try:
-                    location_elem = container.find_element(By.CSS_SELECTOR, selector)
-                    info['location'] = location_elem.text.strip()
-                    if info['location']:
+                    location_elem = job_element.find_element(By.CSS_SELECTOR, selector)
+                    location = location_elem.text.strip()
+                    if location:
                         break
                 except:
                     continue
             
-            # Extract salary from left panel
+            # Extract salary (if available)
+            salary = None
             salary_selectors = [
-                '[data-test*="salary"]',
-                '.salary', 
+                '[data-test="detailSalary"]', '.salary', '.salaryText',
                 '[class*="salary"]'
             ]
             
             for selector in salary_selectors:
                 try:
-                    salary_elem = container.find_element(By.CSS_SELECTOR, selector)
-                    salary_text = salary_elem.text.strip()
-                    if salary_text and ('₹' in salary_text or '$' in salary_text or 'lakh' in salary_text.lower()):
-                        info['salary'] = salary_text
+                    salary_elem = job_element.find_element(By.CSS_SELECTOR, selector)
+                    salary = salary_elem.text.strip()
+                    if salary:
                         break
                 except:
                     continue
             
-        except Exception as e:
-            logger.debug(f"Error extracting basic info: {str(e)}")
-        
-        return info
-    
-    def _extract_detailed_job_info_from_page(self) -> Dict:
-        """Extract detailed job information from a dedicated job page (if navigated to one)"""
-        info = {}
-        
-        try:
-            # Wait longer for page content to load
-            logger.debug("⏳ Waiting for dedicated page content to load...")
-            time.sleep(4)
+            # Extract application URL
+            app_url = ""
+            try:
+                link_elem = job_element.find_element(By.CSS_SELECTOR, 'a')
+                app_url = link_elem.get_attribute('href')
+                if app_url and not app_url.startswith('http'):
+                    app_url = self.base_url + app_url
+            except:
+                pass
             
-            # On dedicated job pages, selectors might be different
-            # Extract company name
-            company_selectors = [
-                '.employerName',
-                '[data-test="employer-name"]',
-                '.employer',
-                'h1 + div a',  # Company often after job title
-                '.companyHeader a',
-                '[class*="employer"]',
-                '[class*="company"]',
-                '.company-name'
-            ]
-            
-            for selector in company_selectors:
-                try:
-                    company_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    company_text = company_elem.text.strip()
-                    if company_text and len(company_text) > 1 and company_text not in ['Jobs', 'Apply', 'Save']:
-                        info['company'] = company_text
-                        logger.debug(f"✅ Found company on dedicated page: {company_text}")
-                        break
-                except:
-                    continue
-            
-            # Extract company rating
-            rating_selectors = [
-                '.rating',
-                '[class*="rating"]',
-                '.starRating',
-                '[data-test*="rating"]',
-                '.ratingNumber'
-            ]
-            
-            for selector in rating_selectors:
-                try:
-                    rating_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    rating_text = rating_elem.text.strip()
-                    rating_match = re.search(r'(\d+\.?\d*)★?', rating_text)
-                    if rating_match:
-                        info['company_rating'] = float(rating_match.group(1))
-                        logger.debug(f"✅ Found rating on dedicated page: {info['company_rating']}")
-                        break
-                except:
-                    continue
-            
-            # Enhanced job description extraction for dedicated pages
-            logger.debug("🔍 Looking for job description on dedicated page...")
-            desc_selectors = [
-                # Primary selectors for dedicated pages
-                '.jobDescriptionContent',
-                '[data-test="jobDescription"]',
-                '.jobDescription',
-                '#JobDescription',
-                '.jobDetailText',
-                '.job-description-content',
-                
-                # Alternative selectors for dedicated pages
-                '[class*="description"]',
-                '.jobSummary',
-                '.description',
-                '.content',
-                '.job-content',
-                '.main-content',
-                
-                # Glassdoor specific for dedicated pages
-                '.jobDescriptionWrapper',
-                '.jobDesc',
-                '[data-test="job-description"]',
-                '.job-description-container',
-                
-                # Generic content selectors
-                '.job-details',
-                'div[class*="Job"][class*="Description"]',
-                '.job-posting-description',
-                
-                # Fallback selectors
-                'main',
-                'article',
-                '.content-wrapper'
-            ]
-            
-            description_found = False
-            for selector in desc_selectors:
-                try:
-                    desc_elems = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    for desc_elem in desc_elems:
-                        description = desc_elem.text.strip()
-                        # Check for substantial description (more than just title/header)
-                        if description and len(description) > 100:  # Require at least 100 characters
-                            # Remove common non-description text
-                            if not any(phrase in description.lower() for phrase in ['navigation', 'menu', 'cookie', 'privacy policy']):
-                                info['description'] = description[:3000]  # Longer for dedicated pages
-                                logger.debug(f"✅ Found description on dedicated page: {len(description)} characters")
-                                description_found = True
-                                break
-                    if description_found:
-                        break
-                except:
-                    continue
-            
-            if not description_found:
-                # Fallback: try to get the main content area
-                logger.debug("🔄 Trying fallback description extraction on dedicated page...")
-                try:
-                    # Look for the main content area
-                    main_content_selectors = ['main', 'article', '[role="main"]', '.main', '.content']
-                    for selector in main_content_selectors:
-                        try:
-                            main_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                            text = main_elem.text.strip()
-                            if len(text) > 200:  # Substantial content
-                                info['description'] = text[:3000]
-                                logger.debug(f"✅ Found fallback description: {len(text)} characters")
-                                description_found = True
-                                break
-                        except:
-                            continue
-                        if description_found:
-                            break
-                
-                except Exception as e:
-                    logger.debug(f"Fallback description extraction failed: {str(e)}")
-            
-            # Extract requirements/qualifications
+            # Get job description with "View More" handling
+            description = "Job description not available"
             requirements = []
-            req_selectors = [
-                '.qualifications',
-                '[class*="requirement"]',
-                '[class*="qualification"]',
-                '.jobRequirements',
-                '#Qualifications',
-                '.requirements',
-                '.skills',
-                '.job-requirements'
-            ]
+            company_rating = None
             
-            for selector in req_selectors:
-                try:
-                    req_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    req_text = req_elem.text.strip()
-                    if req_text and len(req_text) > 20:
-                        # Split into list if it contains bullet points or line breaks
-                        requirements = [req.strip() for req in re.split(r'[•\n]', req_text) if req.strip() and len(req.strip()) > 5]
-                        logger.debug(f"✅ Found {len(requirements)} requirements on dedicated page")
-                        break
-                except:
-                    continue
-            
-            info['requirements'] = requirements
-            
-            # Extract salary information
-            salary_selectors = [
-                '.salaryText',
-                '[data-test*="salary"]',
-                '[class*="salary"]',
-                '.compensation',
-                '.payRange',
-                '.pay',
-                '.wage'
-            ]
-            
-            for selector in salary_selectors:
-                try:
-                    salary_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    salary_text = salary_elem.text.strip()
-                    if salary_text and ('₹' in salary_text or '$' in salary_text or 'lakh' in salary_text.lower()):
-                        info['salary'] = salary_text
-                        logger.debug(f"✅ Found salary on dedicated page: {salary_text}")
-                        break
-                except:
-                    continue
-            
-            # Extract location if available
-            location_selectors = [
-                '.location',
-                '[data-test="job-location"]',
-                '[class*="location"]',
-                '.jobLocation'
-            ]
-            
-            for selector in location_selectors:
-                try:
-                    location_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    location_text = location_elem.text.strip()
-                    if location_text:
-                        info['location'] = location_text
-                        logger.debug(f"✅ Found location on dedicated page: {location_text}")
-                        break
-                except:
-                    continue
-            
-        except Exception as e:
-            logger.debug(f"Error extracting from dedicated page: {str(e)}")
-        
-        return info
-
-    def _extract_detailed_job_info(self) -> Dict:
-        """Extract detailed job information from the right panel"""
-        info = {}
-        
-        try:
-            # Wait longer for right panel content to load
-            logger.debug("⏳ Waiting for detailed content to load...")
-            time.sleep(3)
-            
-            # Extract company name from right panel (more reliable)
-            company_selectors = [
-                '.employerName',
-                '[data-test="employer-name"]',
-                '.employer',
-                'h4 a',  # Company name is often in h4
-                '[class*="employer"]',
-                '.companyHeader a',
-                '.company-name'
-            ]
-            
-            for selector in company_selectors:
-                try:
-                    company_elems = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    for elem in company_elems:
-                        company_text = elem.text.strip()
-                        if company_text and len(company_text) > 1 and company_text not in ['Jobs', 'Apply', 'Save']:
-                            info['company'] = company_text
-                            logger.debug(f"✅ Found company: {company_text}")
-                            break
-                    if 'company' in info:
-                        break
-                except:
-                    continue
-            
-            # Extract company rating
-            rating_selectors = [
-                '.rating',
-                '[class*="rating"]',
-                '.starRating',
-                '[data-test*="rating"]',
-                '.ratingNumber'
-            ]
-            
-            for selector in rating_selectors:
-                try:
-                    rating_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    rating_text = rating_elem.text.strip()
-                    rating_match = re.search(r'(\d+\.?\d*)★?', rating_text)
-                    if rating_match:
-                        info['company_rating'] = float(rating_match.group(1))
-                        logger.debug(f"✅ Found rating: {info['company_rating']}")
-                        break
-                except:
-                    continue
-            
-            # Enhanced job description extraction with more selectors
-            logger.debug("🔍 Looking for job description...")
-            desc_selectors = [
-                # Primary selectors for job description
-                '.jobDescriptionContent',
-                '[data-test="jobDescription"]',
-                '.jobDescription',
-                '#JobDescription',
-                '.jobDetailText',
-                '.job-description',
+            try:
+                # Click on the job to get more details
+                clickable_elem = job_element.find_element(By.CSS_SELECTOR, 'a, [data-test="job-title"]')
+                clickable_elem.click()
+                time.sleep(1)  # Reduced wait time for speed
                 
-                # Alternative selectors
-                '[class*="description"]',
-                '.jobSummary',
-                '.description',
-                '.content',
-                '.job-content',
+                # Extract description with "View More" button handling
+                desc_selectors = [
+                    '[data-test="jobDescriptionText"]', '.jobDescriptionContent',
+                    '.desc', '.description', '[class*="description"]',
+                    '.jobDescriptionWrapper'
+                ]
                 
-                # Glassdoor specific selectors
-                '.jobDescriptionWrapper',
-                '.jobDesc',
-                '[data-test="job-description"]',
-                
-                # Generic content selectors
-                '.main-content',
-                '.job-details',
-                'div[class*="Job"][class*="Description"]'
-            ]
-            
-            description_found = False
-            for selector in desc_selectors:
-                try:
-                    desc_elems = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    for desc_elem in desc_elems:
+                description_found = False
+                for selector in desc_selectors:
+                    try:
+                        desc_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        
+                        # Look for "View More" or "Read full description" button
+                        try:
+                            view_more_selectors = [
+                                'button:contains("View more")',
+                                'button:contains("Read full description")', 
+                                'button:contains("Show more")',
+                                '[data-test="show-more"]',
+                                '.showMoreButton',
+                                'button[class*="showMore"]',
+                                'button[class*="readMore"]',
+                                '[class*="show-more"]',
+                                '[class*="read-more"]'
+                            ]
+                            
+                            for view_more_selector in view_more_selectors:
+                                try:
+                                    # Look for the button within or near the description element
+                                    view_more_btn = None
+                                    try:
+                                        view_more_btn = desc_elem.find_element(By.CSS_SELECTOR, view_more_selector)
+                                    except:
+                                        # Try to find it in the whole page
+                                        view_more_btn = self.driver.find_element(By.CSS_SELECTOR, view_more_selector)
+                                    
+                                    if view_more_btn and view_more_btn.is_displayed():
+                                        logger.debug(f"🔍 Clicking 'View More' for full description")
+                                        self.driver.execute_script("arguments[0].click();", view_more_btn)
+                                        time.sleep(0.5)  # Brief wait for content to expand
+                                        break
+                                except:
+                                    continue
+                                    
+                        except Exception as e:
+                            logger.debug(f"No 'View More' button found: {e}")
+                        
+                        # Extract the (now potentially expanded) description
                         description = desc_elem.text.strip()
-                        # Check for substantial description (more than just title/header)
-                        if description and len(description) > 100:  # Require at least 100 characters
-                            info['description'] = description[:2000]  # Limit to 2000 chars
-                            logger.debug(f"✅ Found description: {len(description)} characters")
+                        if len(description) > 50:  # Ensure we got substantial content
                             description_found = True
+                            # Limit description length for performance
+                            if len(description) > 3000:
+                                description = description[:3000] + "..."
+                            logger.debug(f"✅ Extracted description: {len(description)} characters")
                             break
-                    if description_found:
-                        break
-                except:
-                    continue
-            
-            if not description_found:
-                # Fallback: try to get any substantial text content
-                logger.debug("🔄 Trying fallback description extraction...")
-                try:
-                    # Look for the largest text block on the page
-                    all_divs = self.driver.find_elements(By.TAG_NAME, 'div')
-                    largest_text = ""
-                    for div in all_divs:
-                        try:
-                            text = div.text.strip()
-                            if len(text) > len(largest_text) and len(text) > 100:
-                                # Check if it's not navigation or header text
-                                if not any(word in text.lower() for word in ['navigation', 'menu', 'header', 'footer', 'copyright']):
-                                    largest_text = text
-                        except:
-                            continue
-                    
-                    if largest_text:
-                        info['description'] = largest_text[:2000]
-                        logger.debug(f"✅ Found fallback description: {len(largest_text)} characters")
+                            
+                    except Exception as e:
+                        logger.debug(f"Description selector {selector} failed: {e}")
+                        continue
                 
-                except Exception as e:
-                    logger.debug(f"Fallback description extraction failed: {str(e)}")
+                # If no description found, try alternative approach
+                if not description_found:
+                    try:
+                        # Look for any large text block
+                        all_text_elements = self.driver.find_elements(By.TAG_NAME, 'div')
+                        largest_text = ""
+                        for elem in all_text_elements[:10]:  # Limit for speed
+                            try:
+                                text = elem.text.strip()
+                                if len(text) > len(largest_text) and len(text) > 100:
+                                    if not any(word in text.lower() for word in ['navigation', 'menu', 'header', 'footer']):
+                                        largest_text = text
+                            except:
+                                continue
+                        
+                        if largest_text:
+                            description = largest_text[:2000]  # Reasonable limit
+                            logger.debug(f"✅ Found fallback description: {len(description)} characters")
+                    
+                    except Exception as e:
+                        logger.debug(f"Fallback description extraction failed: {e}")
+                
+                # Extract company rating (quick)
+                rating_selectors = [
+                    '[data-test="rating"]', '.rating', '.companyRating',
+                    '[class*="rating"]'
+                ]
+                
+                for selector in rating_selectors:
+                    try:
+                        rating_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        rating_text = rating_elem.text.strip()
+                        rating_match = re.search(r'(\d+\.?\d*)', rating_text)
+                        if rating_match:
+                            company_rating = float(rating_match.group(1))
+                            break
+                    except:
+                        continue
+                
+            except Exception as e:
+                logger.debug(f"Could not extract detailed info for job {index}: {str(e)}")
             
-            # Extract requirements/qualifications
-            requirements = []
-            req_selectors = [
-                '.qualifications',
-                '[class*="requirement"]',
-                '[class*="qualification"]',
-                '.jobRequirements',
-                '#Qualifications',
-                '.requirements',
-                '.skills',
-                '.job-requirements'
-            ]
+            # Create job listing
+            all_text = f"{title} {company} {location} {description}".lower()
             
-            for selector in req_selectors:
-                try:
-                    req_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    req_text = req_elem.text.strip()
-                    if req_text and len(req_text) > 20:  # Require substantial content
-                        # Split into list if it contains bullet points or line breaks
-                        requirements = [req.strip() for req in re.split(r'[•\n]', req_text) if req.strip() and len(req.strip()) > 5]
-                        logger.debug(f"✅ Found {len(requirements)} requirements")
-                        break
-                except:
-                    continue
+            job = JobListing(
+                title=title,
+                company=company,
+                location=location,
+                salary=salary,
+                description=description,
+                requirements=requirements,
+                benefits=[],
+                job_type=self._determine_job_type(all_text),
+                experience_level=self._determine_experience_level(all_text),
+                technologies=self._extract_technologies(all_text),
+                posted_date=datetime.now().strftime("%Y-%m-%d"),
+                application_url=app_url,
+                company_rating=company_rating,
+                company_size=None,
+                industry=None,
+                remote_type=self._determine_remote_type(all_text)
+            )
             
-            info['requirements'] = requirements
-            
-            # Look for salary information in detailed view
-            salary_selectors = [
-                '.salaryText',
-                '[data-test*="salary"]',
-                '[class*="salary"]',
-                '.compensation',
-                '.pay',
-                '.wage'
-            ]
-            
-            for selector in salary_selectors:
-                try:
-                    salary_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    salary_text = salary_elem.text.strip()
-                    if salary_text and ('₹' in salary_text or '$' in salary_text or 'lakh' in salary_text.lower()):
-                        info['salary'] = salary_text
-                        logger.debug(f"✅ Found detailed salary: {salary_text}")
-                        break
-                except:
-                    continue
+            return job
             
         except Exception as e:
-            logger.debug(f"Error extracting detailed info: {str(e)}")
-        
-        return info
-    
-    def _merge_job_info(self, basic_info: Dict, detailed_info: Dict) -> JobListing:
-        """Merge basic and detailed job information into a JobListing object"""
-        
-        # Prefer detailed info over basic info when available
-        title = detailed_info.get('title') or basic_info.get('title', 'Not specified')
-        company = detailed_info.get('company') or basic_info.get('company', 'Not specified')
-        location = detailed_info.get('location') or basic_info.get('location', 'Not specified')
-        salary = detailed_info.get('salary') or basic_info.get('salary')
-        description = detailed_info.get('description', '')
-        requirements = detailed_info.get('requirements', [])
-        company_rating = detailed_info.get('company_rating')
-        app_url = basic_info.get('application_url', '')
-        
-        # Analyze all text for additional information
-        all_text = f"{title} {company} {description} {' '.join(requirements)}".lower()
-        
-        # Create job listing
-        job = JobListing(
-            title=title,
-            company=company,
-            location=location,
-            salary=salary,
-            description=description,
-            requirements=requirements,
-            benefits=[],  # Could be extracted similarly if needed
-            job_type=self._determine_job_type(all_text),
-            experience_level=self._determine_experience_level(all_text),
-            technologies=self._extract_technologies(all_text),
-            posted_date=datetime.now().strftime("%Y-%m-%d"),
-            application_url=app_url,
-            company_rating=company_rating,
-            company_size=None,
-            industry=None,
-            remote_type=self._determine_remote_type(all_text)
-        )
-        
-        return job
-    
+            logger.debug(f"Error extracting job details: {str(e)}")
+            return None
+
     def _go_to_next_page(self) -> bool:
         """Navigate to the next page of results"""
         try:
             next_button_selectors = [
-                '[data-test="pagination-next"]',
-                '.next',
-                '[aria-label="Next"]',
-                'button:contains("Next")'
+                '[data-test="pagination-next"]', '.next',
+                '[aria-label="Next"]', 'button:contains("Next")'
             ]
             
             for selector in next_button_selectors:
@@ -1340,39 +797,19 @@ class GlassdoorSeleniumScraper:
         """Close the browser"""
         if self.driver:
             self.driver.quit()
-            logger.info("🔚 Browser closed")
+            logger.info("📚 Browser closed")
 
 def test_selenium_scraper():
-    """Test the Selenium-based Glassdoor scraper with two-step login"""
-    logger.info("🧪 Testing Glassdoor Selenium scraper...")
-    logger.info("📝 Note: Glassdoor uses a two-step login process:")
-    logger.info("   1. Enter email → Continue to password page")
-    logger.info("   2. Enter password → Complete login")
+    """Test the improved Glassdoor scraper"""
+    logger.info("🧪 Testing Improved Glassdoor Selenium scraper...")
     
     # Initialize scraper
     scraper = GlassdoorSeleniumScraper(
-        # Add your credentials here:
-        email="laavanya.mishra094@nmims.edu.in",
-        password="Laavanya0104",
-        headless=False,  # Set to True to run in background
+        headless=True,  # Always headless for deployment
         use_india_site=True
     )
     
     try:
-        # Login if credentials provided
-        if scraper.email and scraper.password:
-            logger.info("🔐 Starting two-step login process...")
-            login_success = scraper.login()
-            
-            if login_success:
-                logger.info("🎉 Login successful! Proceeding with job search...")
-            else:
-                logger.warning("⚠️ Login failed. Continuing without authentication...")
-                logger.info("💡 Tips for login issues:")
-                logger.info("   - Check your email and password")
-                logger.info("   - Complete any CAPTCHA if prompted")
-                logger.info("   - Check debug screenshots if saved")
-        
         # Test searches
         test_searches = [
             {'keywords': 'python developer', 'location': 'Bangalore'},
@@ -1402,20 +839,16 @@ def test_selenium_scraper():
             else:
                 logger.warning("⚠️ No jobs found for this search")
             
-            time.sleep(5)  # Delay between searches
+            time.sleep(2)  # Reduced delay between searches
         
         if all_jobs:
             scraper.save_jobs_to_json(all_jobs)
             logger.info(f"🎉 Total jobs found: {len(all_jobs)}")
         else:
             logger.warning("❌ No jobs found")
-            logger.info("💡 Troubleshooting tips:")
-            logger.info("   - Ensure you're logged in successfully")
-            logger.info("   - Try different search terms")
-            logger.info("   - Check if Glassdoor is accessible in your region")
     
     except KeyboardInterrupt:
-        logger.info("⏹️ Test interrupted by user")
+        logger.info("ℹ️ Test interrupted by user")
     
     finally:
         scraper.close()
