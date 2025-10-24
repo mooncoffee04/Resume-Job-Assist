@@ -1,10 +1,9 @@
 [theme]
-primaryColor = "#1f77b4"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
-font = "Nunito:https://fonts.googleapis.com/css2?family=Nunito&display=swap"
-codeFont = "'Space Mono':https://fonts.googleapis.com/css2?family=Space+Mono&display=swap"
+base="dark"
+primaryColor="#dea2de"
+secondaryBackgroundColor="#421950"
+textColor="#b3adac"
+
 
 [server]
 maxUploadSize = 10
