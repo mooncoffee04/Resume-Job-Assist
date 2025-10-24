@@ -128,7 +128,7 @@ class GlassdoorSeleniumScraper:
                 logger.info("⏳ Waiting 30 seconds for manual completion...")
                 
                 # Wait for user to complete verification
-                time.sleep(30)
+                # time.sleep(30)
                 
                 return True
             
