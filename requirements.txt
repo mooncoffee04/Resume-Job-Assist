@@ -15,6 +15,9 @@ spacy
 transformers
 python-dateutil
 python-dotenv
+pyarrow
+datasets
+sentence-transformers
 # NLP Job Discovery System Requirements
 # Install these for the advanced NLP features
 
