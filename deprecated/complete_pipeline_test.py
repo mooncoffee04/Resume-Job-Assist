@@ -43,7 +43,7 @@ def run_complete_pipeline():
     print("-" * 50)
     
     try:
-        from test_connection import process_resume_step_by_step
+        from deprecated.test_connection import process_resume_step_by_step
         
         analysis_results = process_resume_step_by_step(str(resume_file))
         
